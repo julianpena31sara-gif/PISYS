@@ -1,0 +1,645 @@
+/* ============================================================
+   estilos.css — Estilos personalizados del sistema InvenSys
+   ============================================================
+   Bootstrap ya da mucho por defecto. Aquí solo sobreescribimos
+   lo que necesitamos para darle personalidad al sistema.
+   
+   Usamos variables CSS (--nombre) para mantener colores
+   consistentes en toda la app. Si quieres cambiar el color
+   principal, solo cambias --color-primario y listo.
+   ============================================================ */
+
+/* ------ VARIABLES GLOBALES ------ */
+:root {
+    /* Colores principales */
+    --color-primario: #2563EB;
+    --color-primario-hover: #1D4ED8;
+    --color-primario-claro: #EFF6FF;
+
+    /* Colores de estado */
+    --color-critico: #DC2626;
+    --color-critico-bg: #FEF2F2;
+    --color-bajo: #D97706;
+    --color-bajo-bg: #FFFBEB;
+    --color-normal: #16A34A;
+    --color-normal-bg: #F0FDF4;
+    --color-morado: #7C3AED;
+    --color-morado-bg: #F5F3FF;
+
+    /* Fondos y superficies */
+    --bg-principal: #F8FAFC;
+    --bg-card: #FFFFFF;
+    --bg-navbar: #FFFFFF;
+
+    /* Texto */
+    --texto-principal: #0F172A;
+    --texto-secundario: #64748B;
+    --texto-muted: #94A3B8;
+
+    /* Bordes */
+    --borde: #E2E8F0;
+    --borde-suave: #F1F5F9;
+
+    /* Sombras */
+    --sombra-card: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+    --sombra-hover: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+
+    /* Tipografía */
+    --font-principal: 'DM Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+
+    /* Transiciones */
+    --transicion: 0.2s ease;
+
+    /* Layout */
+    --navbar-height: 64px;
+}
+
+/* ------ RESET Y BASE ------ */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-principal);
+    background-color: var(--bg-principal);
+    color: var(--texto-principal);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ------ NAVBAR ------ */
+#navbar-principal {
+    background-color: var(--bg-navbar);
+    border-bottom: 1px solid var(--borde);
+    height: var(--navbar-height);
+    box-shadow: 0 1px 0 var(--borde);
+}
+
+/* Logo / Nombre */
+.brand-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--color-primario), #7C3AED);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.1rem;
+}
+
+.brand-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--texto-principal);
+    letter-spacing: -0.3px;
+}
+
+/* Links del navbar */
+.navbar .nav-link {
+    color: var(--texto-secundario);
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    transition: all var(--transicion);
+}
+
+.navbar .nav-link:hover {
+    color: var(--color-primario);
+    background-color: var(--color-primario-claro);
+}
+
+.navbar .nav-link.active {
+    color: var(--color-primario);
+    background-color: var(--color-primario-claro);
+    font-weight: 600;
+}
+
+/* Botón "Nuevo Producto" */
+.btn-agregar {
+    background-color: var(--color-primario);
+    color: white !important;
+    padding: 0.4rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all var(--transicion);
+    display: inline-flex;
+    align-items: center;
+    border: none;
+}
+
+.btn-agregar:hover {
+    background-color: var(--color-primario-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+/* ------ PAGE HEADER ------ */
+.page-header {
+    background-color: var(--bg-card);
+    border-bottom: 1px solid var(--borde);
+    padding: 1.5rem 0;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--texto-principal);
+    margin: 0;
+    letter-spacing: -0.5px;
+}
+
+.page-subtitle {
+    color: var(--texto-secundario);
+    font-size: 0.875rem;
+    margin: 0.25rem 0 0;
+}
+
+.badge-fecha {
+    background-color: var(--borde-suave);
+    color: var(--texto-secundario);
+    padding: 0.4rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+
+/* ------ TARJETAS KPI ------ */
+.kpi-card {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid var(--borde);
+    box-shadow: var(--sombra-card);
+    transition: all var(--transicion);
+    height: 100%;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--sombra-hover);
+}
+
+.kpi-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+}
+
+.kpi-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.kpi-valor {
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+}
+
+.kpi-label {
+    font-size: 0.78rem;
+    color: var(--texto-secundario);
+    font-weight: 500;
+}
+
+/* Variantes de color para KPI cards */
+.kpi-azul .kpi-icon {
+    background-color: var(--color-primario-claro);
+    color: var(--color-primario);
+}
+.kpi-azul .kpi-valor { color: var(--color-primario); }
+
+.kpi-rojo .kpi-icon {
+    background-color: var(--color-critico-bg);
+    color: var(--color-critico);
+}
+.kpi-rojo .kpi-valor { color: var(--color-critico); }
+
+.kpi-amarillo .kpi-icon {
+    background-color: var(--color-bajo-bg);
+    color: var(--color-bajo);
+}
+.kpi-amarillo .kpi-valor { color: var(--color-bajo); }
+
+.kpi-verde .kpi-icon {
+    background-color: var(--color-normal-bg);
+    color: var(--color-normal);
+}
+.kpi-verde .kpi-valor { color: var(--color-normal); }
+
+.kpi-morado .kpi-icon {
+    background-color: var(--color-morado-bg);
+    color: var(--color-morado);
+}
+.kpi-morado .kpi-valor { color: var(--color-morado); }
+
+/* ------ SECCIONES DE ALERTAS ------ */
+.card-seccion {
+    background: var(--bg-card);
+    border: 1px solid var(--borde);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--sombra-card);
+    height: 100%;
+}
+
+.card-seccion-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--borde);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: var(--bg-principal);
+}
+
+.card-seccion-header h5 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--texto-principal);
+}
+
+.card-seccion-body {
+    padding: 0.5rem 0;
+}
+
+/* Indicadores de color en el header */
+.indicador-rojo, .indicador-amarillo, .indicador-verde {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.indicador-rojo { background-color: var(--color-critico); }
+.indicador-amarillo { background-color: var(--color-bajo); }
+.indicador-verde { background-color: var(--color-normal); }
+
+/* Items de alerta */
+.alerta-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.25rem;
+    border-left: 3px solid transparent;
+    transition: background var(--transicion);
+}
+
+.alerta-item:hover {
+    background-color: var(--bg-principal);
+}
+
+.alerta-critica {
+    border-left-color: var(--color-critico);
+}
+
+.alerta-baja {
+    border-left-color: var(--color-bajo);
+}
+
+.alerta-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.alerta-nombre {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--texto-principal);
+}
+
+.alerta-categoria {
+    font-size: 0.75rem;
+    color: var(--texto-muted);
+}
+
+.alerta-stock {
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+}
+
+.stock-numero {
+    font-size: 1.4rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    line-height: 1;
+}
+.stock-critico { color: var(--color-critico); }
+.stock-bajo { color: var(--color-bajo); }
+
+.stock-label {
+    font-size: 0.7rem;
+    color: var(--texto-muted);
+}
+
+.alerta-vacia {
+    padding: 2rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: center;
+    color: var(--texto-secundario);
+    font-size: 0.875rem;
+}
+
+/* ------ ACCESOS RÁPIDOS ------ */
+.seccion-titulo {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--texto-secundario);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.acceso-rapido {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem;
+    background: var(--bg-card);
+    border: 1px solid var(--borde);
+    border-radius: 14px;
+    text-decoration: none;
+    color: var(--texto-principal);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all var(--transicion);
+    box-shadow: var(--sombra-card);
+    position: relative;
+    min-height: 100px;
+}
+
+.acceso-rapido i {
+    font-size: 1.5rem;
+    color: var(--color-primario);
+}
+
+.acceso-rapido:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--sombra-hover);
+    border-color: var(--color-primario);
+    color: var(--color-primario);
+}
+
+.acceso-deshabilitado {
+    opacity: 0.6;
+    cursor: default;
+    pointer-events: none;
+}
+
+.badge-pronto {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background-color: var(--borde-suave);
+    color: var(--texto-muted);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 500;
+}
+
+/* ------ TABLA DE PRODUCTOS ------ */
+.tabla-container {
+    background: var(--bg-card);
+    border: 1px solid var(--borde);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--sombra-card);
+}
+
+.tabla-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--borde);
+    background-color: var(--bg-principal);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--texto-principal);
+}
+
+.tabla-footer {
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--borde);
+    background-color: var(--bg-principal);
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--texto-secundario);
+}
+
+.tabla-productos th {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--texto-secundario);
+    background-color: var(--bg-principal);
+    border-bottom: 1px solid var(--borde) !important;
+    padding: 0.75rem 1rem;
+    white-space: nowrap;
+}
+
+.tabla-productos td {
+    padding: 0.875rem 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--borde-suave) !important;
+    font-size: 0.875rem;
+}
+
+.fila-producto {
+    transition: background var(--transicion);
+}
+
+.fila-producto:hover {
+    background-color: var(--bg-principal);
+}
+
+/* Fila de color según estado */
+.fila-critico:hover { background-color: #FEF2F2; }
+.fila-bajo:hover    { background-color: #FFFBEB; }
+
+.producto-nombre {
+    font-weight: 500;
+    color: var(--texto-principal);
+}
+
+.producto-desc {
+    font-size: 0.75rem;
+    color: var(--texto-muted);
+    margin-top: 2px;
+}
+
+.badge-categoria {
+    background-color: var(--color-primario-claro);
+    color: var(--color-primario);
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.cantidad-badge {
+    display: inline-block;
+    min-width: 40px;
+    padding: 0.2rem 0.6rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+}
+
+.cantidad-critico {
+    background-color: var(--color-critico-bg);
+    color: var(--color-critico);
+}
+
+.cantidad-bajo {
+    background-color: var(--color-bajo-bg);
+    color: var(--color-bajo);
+}
+
+.cantidad-normal {
+    background-color: var(--color-normal-bg);
+    color: var(--color-normal);
+}
+
+/* Botones de acción en la tabla */
+.btn-accion {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--borde);
+    background: transparent;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all var(--transicion);
+    color: var(--texto-secundario);
+}
+
+.btn-ver:hover   { background: var(--color-primario-claro); color: var(--color-primario); border-color: var(--color-primario); }
+.btn-editar:hover { background: var(--color-bajo-bg); color: var(--color-bajo); border-color: var(--color-bajo); }
+.btn-eliminar:hover { background: var(--color-critico-bg); color: var(--color-critico); border-color: var(--color-critico); }
+
+/* Puntos de la leyenda */
+.dot-critico, .dot-bajo, .dot-normal {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+.dot-critico { background-color: var(--color-critico); }
+.dot-bajo    { background-color: var(--color-bajo); }
+.dot-normal  { background-color: var(--color-normal); }
+
+/* ------ ESTADO VACÍO ------ */
+.estado-vacio {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--texto-secundario);
+}
+
+/* ------ COMING SOON (Dashboard y Reportes) ------ */
+.coming-soon-card {
+    background: var(--bg-card);
+    border: 1px solid var(--borde);
+    border-radius: 20px;
+    padding: 3rem 2rem;
+    text-align: center;
+    max-width: 560px;
+    margin: 0 auto;
+    box-shadow: var(--sombra-card);
+}
+
+.coming-soon-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1.5rem;
+    opacity: 0.6;
+}
+
+.coming-soon-card h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.features-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    text-align: left;
+    font-size: 0.875rem;
+    color: var(--texto-secundario);
+}
+
+.features-lista span {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* ------ MAIN CONTENT Y FOOTER ------ */
+.main-content {
+    flex: 1;
+}
+
+.footer {
+    background-color: var(--bg-card);
+    border-top: 1px solid var(--borde);
+    padding: 1rem 0;
+    margin-top: auto;
+}
+
+.footer-text {
+    font-size: 0.8rem;
+    color: var(--texto-muted);
+}
+
+/* ------ UTILIDADES ------ */
+code {
+    background-color: var(--borde-suave);
+    color: var(--color-primario);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+}
+
+/* ------ RESPONSIVE ------ */
+@media (max-width: 576px) {
+    .page-title {
+        font-size: 1.25rem;
+    }
+    .kpi-valor {
+        font-size: 1.3rem;
+    }
+    .tabla-header {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: flex-start;
+    }
+}

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block titulo %}Productos{% endblock %}
+
+{% block contenido %}
+
+<div class="page-header">
+    <div class="container-fluid px-4">
+        <div class="row align-items-center">
+            <div class="col">
+                <h1 class="page-title">Inventario de Productos</h1>
+                <p class="page-subtitle">
+                    {{ productos | length }} producto(s) en el sistema
+                </p>
+            </div>
+            <div class="col-auto">
+                <a href="#" class="btn btn-agregar">
+                    <i class="bi bi-plus-lg me-1"></i>Nuevo Producto
+                    <span class="badge bg-secondary ms-1" style="font-size:0.65rem;">Semana 5</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid px-4 mt-4 mb-5">
+
+    {# Si no hay productos, mostramos un estado vacío #}
+    {% if not productos %}
+    <div class="estado-vacio">
+        <i class="bi bi-inbox fs-1 text-muted"></i>
+        <h4 class="mt-3">No hay productos aún</h4>
+        <p class="text-muted">Ejecuta <code>python seed.py</code> para cargar datos de prueba.</p>
+    </div>
+
+    {% else %}
+
+    {# Tabla de productos #}
+    <div class="tabla-container">
+        <div class="tabla-header">
+            <div class="d-flex gap-2 align-items-center">
+                <i class="bi bi-table"></i>
+                <span>Todos los productos</span>
+            </div>
+            {# Leyenda de colores #}
+            <div class="d-flex gap-3 align-items-center" style="font-size: 0.8rem;">
+                <span class="d-flex align-items-center gap-1">
+                    <span class="dot-critico"></span> Crítico (&lt;5)
+                </span>
+                <span class="d-flex align-items-center gap-1">
+                    <span class="dot-bajo"></span> Bajo (&lt;10)
+                </span>
+                <span class="d-flex align-items-center gap-1">
+                    <span class="dot-normal"></span> Normal
+                </span>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table tabla-productos mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Producto</th>
+                        <th>Categoría</th>
+                        <th class="text-end">Precio</th>
+                        <th class="text-center">Stock</th>
+                        <th class="text-end">Valor Total</th>
+                        <th class="text-center">Estado</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for producto in productos %}
+                    <tr class="fila-producto fila-{{ producto.estado_stock() }}">
+                        <td class="text-muted" style="font-family: var(--font-mono);">
+                            {{ "%03d"|format(producto.id) }}
+                        </td>
+                        <td>
+                            <div class="producto-nombre">{{ producto.nombre }}</div>
+                            {% if producto.descripcion %}
+                            <div class="producto-desc">{{ producto.descripcion[:60] }}{% if producto.descripcion|length > 60 %}...{% endif %}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge-categoria">{{ producto.categoria }}</span>
+                        </td>
+                        <td class="text-end" style="font-family: var(--font-mono);">
+                            ${{ "{:,.0f}".format(producto.precio) }}
+                        </td>
+                        <td class="text-center">
+                            <span class="cantidad-badge cantidad-{{ producto.estado_stock() }}">
+                                {{ producto.cantidad }}
+                            </span>
+                        </td>
+                        <td class="text-end" style="font-family: var(--font-mono);">
+                            ${{ "{:,.0f}".format(producto.valor_total()) }}
+                        </td>
+                        <td class="text-center">
+                            {% if producto.estado_stock() == 'critico' %}
+                                <span class="badge bg-danger">Crítico</span>
+                            {% elif producto.estado_stock() == 'bajo' %}
+                                <span class="badge bg-warning text-dark">Bajo</span>
+                            {% else %}
+                                <span class="badge bg-success">Normal</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex gap-1 justify-content-center">
+                                <button class="btn-accion btn-ver" title="Ver detalle (Semana 4)">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                                <button class="btn-accion btn-editar" title="Editar (Semana 5)">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn-accion btn-eliminar" title="Eliminar (Semana 6)">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="tabla-footer">
+            <span>Total: {{ productos | length }} productos</span>
+            <span>
+                Valor total del inventario:
+                <strong>
+                    ${{ "{:,.0f}".format(productos | sum(attribute='precio') * 0 + productos | map(attribute='cantidad') | list | sum ) }}
+                </strong>
+            </span>
+        </div>
+    </div>
+
+    {% endif %}
+</div>
+
+{% endblock %}
