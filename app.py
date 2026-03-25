@@ -7,7 +7,7 @@
 # convierte objetos Python en filas de la base de datos.
 # ============================================================
 
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import os
@@ -140,15 +140,120 @@ def inicio():
 
 @app.route('/productos')
 def lista_productos():
-    """
-    Muestra la lista completa de productos.
-    Por ahora solo renderiza la página vacía — en semana 4
-    agregaremos búsqueda y paginación.
-    """
-    # .order_by() ordena los resultados. desc() = descendente
-    productos = Producto.query.order_by(Producto.fecha_creacion.desc()).all()
+    buscar    = request.args.get('buscar', '').strip()
+    categoria = request.args.get('categoria', '')
+    pagina    = request.args.get('pagina', 1, type=int)
+    POR_PAGINA = 10
 
-    return render_template('productos.html', productos=productos)
+    consulta = Producto.query
+
+    if buscar:
+        consulta = consulta.filter(Producto.nombre.ilike(f'%{buscar}%'))
+
+    if categoria:
+        consulta = consulta.filter(Producto.categoria == categoria)
+
+    consulta = consulta.order_by(Producto.fecha_creacion.desc())
+
+    productos_paginados = consulta.paginate(
+        page=pagina,
+        per_page=POR_PAGINA,
+        error_out=False
+    )
+
+    categorias = db.session.query(Producto.categoria)\
+                           .distinct()\
+                           .order_by(Producto.categoria)\
+                           .all()
+    categorias = [c[0] for c in categorias if c[0]]
+
+    return render_template(
+        'productos.html',
+        productos=productos_paginados,
+        categorias=categorias,
+        buscar=buscar,
+        categoria_activa=categoria
+    )
+
+    # ------ LEER PARÁMETROS DE LA URL ------
+
+    # request.args.get('clave', 'valor_por_defecto')
+    # Si el parámetro no está en la URL, devuelve el valor por defecto
+    buscar    = request.args.get('buscar', '').strip()
+    categoria = request.args.get('categoria', '')
+    pagina    = request.args.get('pagina', 1, type=int)  # type=int convierte automáticamente
+
+    # Cuántos productos mostramos por página
+    POR_PAGINA = 10
+
+    # ------ CONSTRUIR LA CONSULTA DINÁMICAMENTE ------
+
+    # Empezamos con una consulta base — todavía no va a la BD
+    # Es como armar la frase SQL paso a paso
+    consulta = Producto.query
+
+    # Si el usuario escribió algo en el buscador, filtramos por nombre
+    # ilike() es como LIKE en SQL pero sin importar mayúsculas/minúsculas
+    # El % antes y después significa "cualquier texto alrededor"
+    if buscar:
+        consulta = consulta.filter(
+            Producto.nombre.ilike(f'%{buscar}%')
+        )
+
+    # Si el usuario eligió una categoría, filtramos por ella
+    if categoria:
+        consulta = consulta.filter(Producto.categoria == categoria)
+
+    # Ordenamos: primero los más recientes
+    consulta = consulta.order_by(Producto.fecha_creacion.desc())
+
+    # ------ PAGINACIÓN ------
+
+    # .paginate() divide los resultados en páginas automáticamente.
+    # Devuelve un objeto especial con los productos de la página actual
+    # y metadata útil: total de páginas, si hay página siguiente, etc.
+    productos_paginados = consulta.paginate(
+        page=pagina,
+        per_page=POR_PAGINA,
+        error_out=False   # Si la página no existe, devuelve lista vacía (no error 404)
+    )
+
+    # ------ CATEGORÍAS PARA EL FILTRO ------
+
+    # Obtenemos todas las categorías únicas para mostrar en el select
+    # .distinct() es como SELECT DISTINCT en SQL — sin repetidos
+    categorias = db.session.query(Producto.categoria)\
+                           .distinct()\
+                           .order_by(Producto.categoria)\
+                           .all()
+    # El resultado es una lista de tuplas [('Electrónica',), ('Papelería',)]
+    # La convertimos a lista plana ['Electrónica', 'Papelería']
+    categorias = [c[0] for c in categorias if c[0]]
+
+    return render_template(
+        'productos.html',
+        productos=productos_paginados,   # objeto paginado (no lista simple)
+        categorias=categorias,
+        buscar=buscar,                   # para que el input muestre lo que buscó
+        categoria_activa=categoria       # para resaltar el filtro activo
+    )
+
+
+@app.route('/productos/<int:id>')
+def detalle_producto(id):
+    """
+    SEMANA 4 — Página de detalle de un producto individual.
+
+    <int:id> en la ruta captura el número de la URL.
+    Ejemplo: /productos/3 → id = 3
+
+    get_or_404() busca el producto por ID.
+    Si no existe, Flask devuelve automáticamente una página de error 404.
+    Mucho mejor que dejar que el servidor explote con un error feo.
+    """
+    producto = Producto.query.get_or_404(id)
+
+    return render_template('detalle.html', producto=producto)
 
 
 @app.route('/dashboard')

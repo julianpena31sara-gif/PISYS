@@ -3,13 +3,16 @@
 
 {% block contenido %}
 
+{# ===== HEADER ===== #}
 <div class="page-header">
     <div class="container-fluid px-4">
         <div class="row align-items-center">
             <div class="col">
                 <h1 class="page-title">Inventario de Productos</h1>
                 <p class="page-subtitle">
-                    {{ productos | length }} producto(s) en el sistema
+                    {{ productos.total }} producto(s) en el sistema
+                    {% if buscar %}— buscando <strong>"{{ buscar }}"</strong>{% endif %}
+                    {% if categoria_activa %}en <strong>{{ categoria_activa }}</strong>{% endif %}
                 </p>
             </div>
             <div class="col-auto">
@@ -24,34 +27,70 @@
 
 <div class="container-fluid px-4 mt-4 mb-5">
 
-    {# Si no hay productos, mostramos un estado vacío #}
-    {% if not productos %}
-    <div class="estado-vacio">
-        <i class="bi bi-inbox fs-1 text-muted"></i>
-        <h4 class="mt-3">No hay productos aún</h4>
-        <p class="text-muted">Ejecuta <code>python seed.py</code> para cargar datos de prueba.</p>
-    </div>
+    {# ===== BUSCADOR Y FILTROS ===== #}
+    {# Usamos GET para que los filtros queden en la URL y sean compartibles #}
+    <form method="GET" action="{{ url_for('lista_productos') }}" class="filtros-form mb-4">
+        <div class="row g-3 align-items-end">
 
-    {% else %}
+            <div class="col-12 col-md-5">
+                <label class="form-label-custom">Buscar producto</label>
+                <div class="input-buscar">
+                    <i class="bi bi-search icono-buscar"></i>
+                    <input type="text" name="buscar" class="form-control input-custom"
+                        placeholder="Escribe el nombre del producto..."
+                        value="{{ buscar }}" autocomplete="off">
+                    {% if buscar %}
+                    <a href="{{ url_for('lista_productos', categoria=categoria_activa) }}"
+                       class="btn-limpiar" title="Limpiar búsqueda">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
 
-    {# Tabla de productos #}
+            <div class="col-12 col-md-4">
+                <label class="form-label-custom">Filtrar por categoría</label>
+                <select name="categoria" class="form-select input-custom" onchange="this.form.submit()">
+                    <option value="" {% if not categoria_activa %}selected{% endif %}>
+                        Todas las categorías
+                    </option>
+                    {% for cat in categorias %}
+                    <option value="{{ cat }}" {% if cat == categoria_activa %}selected{% endif %}>
+                        {{ cat }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-buscar w-100">
+                    <i class="bi bi-search me-1"></i>Buscar
+                </button>
+                {% if buscar or categoria_activa %}
+                <a href="{{ url_for('lista_productos') }}" class="btn-limpiar-todo">
+                    <i class="bi bi-x-circle me-1"></i>Limpiar filtros
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+
+    {# ===== TABLA DE PRODUCTOS ===== #}
+    {% if productos.items %}
+
     <div class="tabla-container">
         <div class="tabla-header">
             <div class="d-flex gap-2 align-items-center">
                 <i class="bi bi-table"></i>
-                <span>Todos los productos</span>
+                <span>
+                    Mostrando {{ productos.items | length }} de {{ productos.total }} productos
+                    — Página {{ productos.page }} de {{ productos.pages }}
+                </span>
             </div>
-            {# Leyenda de colores #}
-            <div class="d-flex gap-3 align-items-center" style="font-size: 0.8rem;">
-                <span class="d-flex align-items-center gap-1">
-                    <span class="dot-critico"></span> Crítico (&lt;5)
-                </span>
-                <span class="d-flex align-items-center gap-1">
-                    <span class="dot-bajo"></span> Bajo (&lt;10)
-                </span>
-                <span class="d-flex align-items-center gap-1">
-                    <span class="dot-normal"></span> Normal
-                </span>
+            <div class="d-flex gap-3 align-items-center" style="font-size: 0.8rem; color: var(--texto-secundario);">
+                <span class="d-flex align-items-center gap-1"><span class="dot-critico"></span> Crítico (&lt;5)</span>
+                <span class="d-flex align-items-center gap-1"><span class="dot-bajo"></span> Bajo (&lt;10)</span>
+                <span class="d-flex align-items-center gap-1"><span class="dot-normal"></span> Normal</span>
             </div>
         </div>
 
@@ -62,39 +101,36 @@
                         <th>#</th>
                         <th>Producto</th>
                         <th>Categoría</th>
-                        <th class="text-end">Precio</th>
+                        <th class="text-end">Precio unitario</th>
                         <th class="text-center">Stock</th>
-                        <th class="text-end">Valor Total</th>
+                        <th class="text-end">Valor total</th>
                         <th class="text-center">Estado</th>
                         <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for producto in productos %}
+                    {% for producto in productos.items %}
                     <tr class="fila-producto fila-{{ producto.estado_stock() }}">
-                        <td class="text-muted" style="font-family: var(--font-mono);">
-                            {{ "%03d"|format(producto.id) }}
-                        </td>
+                        <td class="text-muted id-col">{{ "%03d"|format(producto.id) }}</td>
                         <td>
                             <div class="producto-nombre">{{ producto.nombre }}</div>
                             {% if producto.descripcion %}
-                            <div class="producto-desc">{{ producto.descripcion[:60] }}{% if producto.descripcion|length > 60 %}...{% endif %}</div>
+                            <div class="producto-desc">
+                                {{ producto.descripcion[:55] }}{% if producto.descripcion|length > 55 %}...{% endif %}
+                            </div>
                             {% endif %}
                         </td>
                         <td>
-                            <span class="badge-categoria">{{ producto.categoria }}</span>
+                            <a href="{{ url_for('lista_productos', categoria=producto.categoria) }}"
+                               class="badge-categoria">{{ producto.categoria }}</a>
                         </td>
-                        <td class="text-end" style="font-family: var(--font-mono);">
-                            ${{ "{:,.0f}".format(producto.precio) }}
-                        </td>
+                        <td class="text-end mono-font">${{ "{:,.0f}".format(producto.precio) }}</td>
                         <td class="text-center">
                             <span class="cantidad-badge cantidad-{{ producto.estado_stock() }}">
                                 {{ producto.cantidad }}
                             </span>
                         </td>
-                        <td class="text-end" style="font-family: var(--font-mono);">
-                            ${{ "{:,.0f}".format(producto.valor_total()) }}
-                        </td>
+                        <td class="text-end mono-font">${{ "{:,.0f}".format(producto.valor_total()) }}</td>
                         <td class="text-center">
                             {% if producto.estado_stock() == 'critico' %}
                                 <span class="badge bg-danger">Crítico</span>
@@ -106,13 +142,14 @@
                         </td>
                         <td class="text-center">
                             <div class="d-flex gap-1 justify-content-center">
-                                <button class="btn-accion btn-ver" title="Ver detalle (Semana 4)">
+                                <a href="{{ url_for('detalle_producto', id=producto.id) }}"
+                                   class="btn-accion btn-ver" title="Ver detalle">
                                     <i class="bi bi-eye"></i>
-                                </button>
-                                <button class="btn-accion btn-editar" title="Editar (Semana 5)">
+                                </a>
+                                <button class="btn-accion btn-editar" title="Editar (Semana 5)" disabled>
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                <button class="btn-accion btn-eliminar" title="Eliminar (Semana 6)">
+                                <button class="btn-accion btn-eliminar" title="Eliminar (Semana 6)" disabled>
                                     <i class="bi bi-trash3"></i>
                                 </button>
                             </div>
@@ -124,17 +161,60 @@
         </div>
 
         <div class="tabla-footer">
-            <span>Total: {{ productos | length }} productos</span>
-            <span>
-                Valor total del inventario:
-                <strong>
-                    ${{ "{:,.0f}".format(productos | sum(attribute='precio') * 0 + productos | map(attribute='cantidad') | list | sum ) }}
-                </strong>
-            </span>
+            <span>{{ productos.total }} producto(s) encontrado(s)</span>
         </div>
     </div>
 
+    {# ===== PAGINACIÓN ===== #}
+    {% if productos.pages > 1 %}
+    <nav class="mt-4">
+        <ul class="pagination-custom">
+            <li>
+                {% if productos.has_prev %}
+                <a href="{{ url_for('lista_productos', pagina=productos.prev_num, buscar=buscar, categoria=categoria_activa) }}"
+                   class="btn-pagina"><i class="bi bi-chevron-left"></i> Anterior</a>
+                {% else %}
+                <span class="btn-pagina disabled"><i class="bi bi-chevron-left"></i> Anterior</span>
+                {% endif %}
+            </li>
+            {% for num_pagina in productos.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if num_pagina %}
+                    <li>
+                        <a href="{{ url_for('lista_productos', pagina=num_pagina, buscar=buscar, categoria=categoria_activa) }}"
+                           class="btn-pagina {% if num_pagina == productos.page %}btn-pagina-activa{% endif %}">
+                            {{ num_pagina }}
+                        </a>
+                    </li>
+                {% else %}
+                    <li><span class="btn-pagina disabled">…</span></li>
+                {% endif %}
+            {% endfor %}
+            <li>
+                {% if productos.has_next %}
+                <a href="{{ url_for('lista_productos', pagina=productos.next_num, buscar=buscar, categoria=categoria_activa) }}"
+                   class="btn-pagina">Siguiente <i class="bi bi-chevron-right"></i></a>
+                {% else %}
+                <span class="btn-pagina disabled">Siguiente <i class="bi bi-chevron-right"></i></span>
+                {% endif %}
+            </li>
+        </ul>
+    </nav>
     {% endif %}
-</div>
 
+    {% else %}
+    <div class="estado-vacio">
+        <i class="bi bi-search fs-1 text-muted"></i>
+        <h4 class="mt-3">No se encontraron productos</h4>
+        {% if buscar or categoria_activa %}
+            <p class="text-muted">
+                Intenta con otros términos o
+                <a href="{{ url_for('lista_productos') }}">ver todos los productos</a>.
+            </p>
+        {% else %}
+            <p class="text-muted">Ejecuta <code>python seed.py</code> para cargar datos de prueba.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+</div>
 {% endblock %}
