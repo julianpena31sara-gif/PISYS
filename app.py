@@ -7,7 +7,7 @@
 # convierte objetos Python en filas de la base de datos.
 # ============================================================
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import os
@@ -140,40 +140,16 @@ def inicio():
 
 @app.route('/productos')
 def lista_productos():
-    buscar    = request.args.get('buscar', '').strip()
-    categoria = request.args.get('categoria', '')
-    pagina    = request.args.get('pagina', 1, type=int)
-    POR_PAGINA = 10
+    """
+    SEMANA 4 — Lista de productos con:
+      - Búsqueda por nombre (parámetro GET: ?buscar=laptop)
+      - Filtro por categoría (?categoria=Electrónica)
+      - Paginación (10 productos por página, ?pagina=2)
 
-    consulta = Producto.query
-
-    if buscar:
-        consulta = consulta.filter(Producto.nombre.ilike(f'%{buscar}%'))
-
-    if categoria:
-        consulta = consulta.filter(Producto.categoria == categoria)
-
-    consulta = consulta.order_by(Producto.fecha_creacion.desc())
-
-    productos_paginados = consulta.paginate(
-        page=pagina,
-        per_page=POR_PAGINA,
-        error_out=False
-    )
-
-    categorias = db.session.query(Producto.categoria)\
-                           .distinct()\
-                           .order_by(Producto.categoria)\
-                           .all()
-    categorias = [c[0] for c in categorias if c[0]]
-
-    return render_template(
-        'productos.html',
-        productos=productos_paginados,
-        categorias=categorias,
-        buscar=buscar,
-        categoria_activa=categoria
-    )
+    Los parámetros vienen en la URL. Flask los lee con request.args.
+    Ejemplo de URL completa:
+      /productos?buscar=mouse&categoria=Electrónica&pagina=1
+    """
 
     # ------ LEER PARÁMETROS DE LA URL ------
 
@@ -243,17 +219,200 @@ def lista_productos():
 def detalle_producto(id):
     """
     SEMANA 4 — Página de detalle de un producto individual.
-
-    <int:id> en la ruta captura el número de la URL.
-    Ejemplo: /productos/3 → id = 3
-
-    get_or_404() busca el producto por ID.
-    Si no existe, Flask devuelve automáticamente una página de error 404.
-    Mucho mejor que dejar que el servidor explote con un error feo.
     """
     producto = Producto.query.get_or_404(id)
-
     return render_template('detalle.html', producto=producto)
+
+
+# ============================================================
+# SEMANA 5 — CREAR Y EDITAR PRODUCTOS
+# ============================================================
+
+# Lista de categorías fijas para el formulario.
+# En un sistema más avanzado esto vendría de una tabla separada.
+CATEGORIAS = ['Electrónica', 'Papelería', 'Mobiliario', 'Limpieza',
+              'Alimentos', 'Ropa', 'Herramientas', 'General']
+
+
+@app.route('/productos/nuevo', methods=['GET', 'POST'])
+def nuevo_producto():
+    """
+    SEMANA 5 — Formulario para crear un producto nuevo.
+
+    Esta ruta maneja DOS tipos de petición:
+    - GET:  El usuario abre el formulario vacío (solo visitar la página)
+    - POST: El usuario envió el formulario con datos (hacer clic en Guardar)
+
+    methods=['GET', 'POST'] le dice a Flask que acepte ambos tipos.
+    Dentro usamos request.method para saber cuál llegó.
+    """
+
+    if request.method == 'POST':
+        # ------ EL USUARIO ENVIÓ EL FORMULARIO ------
+
+        # request.form es un diccionario con todos los campos del formulario.
+        # .get('nombre') lee el campo con name="nombre" del HTML.
+        # .strip() elimina espacios en blanco al inicio y al final.
+        nombre      = request.form.get('nombre', '').strip()
+        descripcion = request.form.get('descripcion', '').strip()
+        categoria   = request.form.get('categoria', 'General').strip()
+
+        # Para precio y cantidad necesitamos convertir el texto a número.
+        # Usamos try/except porque si el usuario escribe "abc" en precio,
+        # float("abc") lanzaría un error y rompería la app.
+        try:
+            precio   = float(request.form.get('precio', 0))
+            cantidad = int(request.form.get('cantidad', 0))
+        except ValueError:
+            # Si la conversión falla, mostramos error y volvemos al formulario
+            flash('❌ El precio y la cantidad deben ser números válidos.', 'danger')
+            return render_template('formulario.html',
+                                   titulo='Nuevo Producto',
+                                   categorias=CATEGORIAS,
+                                   producto=None)
+
+        # ------ VALIDACIONES ------
+        # Verificamos que los datos tengan sentido antes de guardar.
+        # Nunca confíes en que el usuario llenó bien el formulario.
+
+        errores = []
+
+        if not nombre:
+            errores.append('El nombre del producto es obligatorio.')
+
+        if len(nombre) > 100:
+            errores.append('El nombre no puede tener más de 100 caracteres.')
+
+        if precio < 0:
+            errores.append('El precio no puede ser negativo.')
+
+        if cantidad < 0:
+            errores.append('La cantidad no puede ser negativa.')
+
+        # Si hay errores, los mostramos y devolvemos el formulario
+        # con los datos que ya había escrito el usuario (para no perderlos)
+        if errores:
+            for error in errores:
+                flash(f'❌ {error}', 'danger')
+            # Pasamos los datos del form para pre-llenar el formulario
+            datos_form = {
+                'nombre': nombre,
+                'descripcion': descripcion,
+                'precio': precio,
+                'cantidad': cantidad,
+                'categoria': categoria
+            }
+            return render_template('formulario.html',
+                                   titulo='Nuevo Producto',
+                                   categorias=CATEGORIAS,
+                                   producto=datos_form)
+
+        # ------ GUARDAR EN LA BASE DE DATOS ------
+        # Si llegamos aquí, todos los datos son válidos.
+
+        nuevo = Producto(
+            nombre=nombre,
+            descripcion=descripcion,
+            precio=precio,
+            cantidad=cantidad,
+            categoria=categoria
+            # fecha_creacion se pone automáticamente (default=datetime.utcnow)
+        )
+
+        # db.session es como una "caja de cambios pendientes".
+        # .add() agrega el objeto a la lista de cambios.
+        # .commit() ejecuta TODOS los cambios de una vez en la BD.
+        # Si algo falla antes del commit, nada se guarda (es seguro).
+        db.session.add(nuevo)
+        db.session.commit()
+
+        # flash() guarda un mensaje que se muestra en la SIGUIENTE página.
+        # 'success' define el color verde del mensaje.
+        flash(f'✅ Producto "{nombre}" creado exitosamente.', 'success')
+
+        # redirect() lleva al usuario a otra página.
+        # url_for('lista_productos') genera la URL /productos
+        return redirect(url_for('lista_productos'))
+
+    # ------ EL USUARIO SOLO ABRIÓ EL FORMULARIO (GET) ------
+    # Mostramos el formulario vacío
+    return render_template('formulario.html',
+                           titulo='Nuevo Producto',
+                           categorias=CATEGORIAS,
+                           producto=None)
+
+
+@app.route('/productos/editar/<int:id>', methods=['GET', 'POST'])
+def editar_producto(id):
+    """
+    SEMANA 5 — Formulario para editar un producto existente.
+
+    Es casi igual a nuevo_producto(), con dos diferencias:
+    1. En GET, pre-llenamos el formulario con los datos actuales.
+    2. En POST, actualizamos el producto existente en vez de crear uno nuevo.
+    """
+
+    # Buscamos el producto. Si no existe → error 404 automático.
+    producto = Producto.query.get_or_404(id)
+
+    if request.method == 'POST':
+        # ------ LEER Y VALIDAR (igual que en nuevo_producto) ------
+
+        nombre      = request.form.get('nombre', '').strip()
+        descripcion = request.form.get('descripcion', '').strip()
+        categoria   = request.form.get('categoria', 'General').strip()
+
+        try:
+            precio   = float(request.form.get('precio', 0))
+            cantidad = int(request.form.get('cantidad', 0))
+        except ValueError:
+            flash('❌ El precio y la cantidad deben ser números válidos.', 'danger')
+            return render_template('formulario.html',
+                                   titulo=f'Editar: {producto.nombre}',
+                                   categorias=CATEGORIAS,
+                                   producto=producto)
+
+        errores = []
+        if not nombre:
+            errores.append('El nombre del producto es obligatorio.')
+        if len(nombre) > 100:
+            errores.append('El nombre no puede tener más de 100 caracteres.')
+        if precio < 0:
+            errores.append('El precio no puede ser negativo.')
+        if cantidad < 0:
+            errores.append('La cantidad no puede ser negativa.')
+
+        if errores:
+            for error in errores:
+                flash(f'❌ {error}', 'danger')
+            return render_template('formulario.html',
+                                   titulo=f'Editar: {producto.nombre}',
+                                   categorias=CATEGORIAS,
+                                   producto=producto)
+
+        # ------ ACTUALIZAR EL PRODUCTO EXISTENTE ------
+        # A diferencia de crear, aquí modificamos el objeto que ya existe.
+        # SQLAlchemy detecta los cambios automáticamente al hacer commit().
+
+        producto.nombre      = nombre
+        producto.descripcion = descripcion
+        producto.precio      = precio
+        producto.cantidad    = cantidad
+        producto.categoria   = categoria
+        # Nota: NO tocamos fecha_creacion, esa queda igual
+
+        # No necesitamos db.session.add() porque el producto
+        # ya está "rastreado" por SQLAlchemy (lo obtuvimos con .get_or_404)
+        db.session.commit()
+
+        flash(f'✅ Producto "{nombre}" actualizado correctamente.', 'success')
+        return redirect(url_for('detalle_producto', id=producto.id))
+
+    # ------ GET: mostrar formulario pre-llenado con datos actuales ------
+    return render_template('formulario.html',
+                           titulo=f'Editar: {producto.nombre}',
+                           categorias=CATEGORIAS,
+                           producto=producto)
 
 
 @app.route('/dashboard')

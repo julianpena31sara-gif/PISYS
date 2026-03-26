@@ -629,6 +629,514 @@ code {
     font-size: 0.875em;
 }
 
+/* ------ SEMANA 4: BUSCADOR Y FILTROS ------ */
+
+.filtros-form {
+    background: var(--bg-card);
+    border: 1px solid var(--borde);
+    border-radius: 16px;
+    padding: 1.25rem;
+    box-shadow: var(--sombra-card);
+}
+
+.form-label-custom {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--texto-secundario);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.input-buscar {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.icono-buscar {
+    position: absolute;
+    left: 12px;
+    color: var(--texto-muted);
+    font-size: 0.875rem;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.input-custom {
+    border: 1px solid var(--borde);
+    border-radius: 10px;
+    font-size: 0.875rem;
+    color: var(--texto-principal);
+    background: var(--bg-principal);
+    transition: all var(--transicion);
+    height: 40px;
+}
+
+.input-buscar .input-custom {
+    padding-left: 36px;
+    padding-right: 36px;
+}
+
+.input-custom:focus {
+    border-color: var(--color-primario);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    outline: none;
+    background: var(--bg-card);
+}
+
+.btn-limpiar {
+    position: absolute;
+    right: 10px;
+    color: var(--texto-muted);
+    font-size: 0.75rem;
+    text-decoration: none;
+    transition: color var(--transicion);
+    z-index: 1;
+}
+
+.btn-limpiar:hover { color: var(--color-critico); }
+
+.btn-buscar {
+    background-color: var(--color-primario);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    height: 40px;
+    transition: all var(--transicion);
+}
+
+.btn-buscar:hover {
+    background-color: var(--color-primario-hover);
+    color: white;
+}
+
+.btn-limpiar-todo {
+    display: block;
+    text-align: center;
+    margin-top: 6px;
+    font-size: 0.78rem;
+    color: var(--texto-muted);
+    text-decoration: none;
+    transition: color var(--transicion);
+}
+
+.btn-limpiar-todo:hover { color: var(--color-critico); }
+
+.mono-font { font-family: var(--font-mono); }
+.id-col { font-family: var(--font-mono); font-size: 0.8rem; }
+
+/* ------ SEMANA 4: PAGINACIÓN ------ */
+
+.pagination-custom {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn-pagina {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border: 1px solid var(--borde);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    color: var(--texto-secundario);
+    text-decoration: none;
+    background: var(--bg-card);
+    transition: all var(--transicion);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-pagina:hover {
+    background: var(--color-primario-claro);
+    color: var(--color-primario);
+    border-color: var(--color-primario);
+}
+
+.btn-pagina-activa {
+    background: var(--color-primario);
+    color: white !important;
+    border-color: var(--color-primario);
+    font-weight: 600;
+}
+
+.btn-pagina.disabled {
+    opacity: 0.4;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ------ SEMANA 4: PÁGINA DE DETALLE ------ */
+
+.breadcrumb-custom {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+.breadcrumb-custom a {
+    color: var(--color-primario);
+    text-decoration: none;
+}
+
+.breadcrumb-custom a:hover { text-decoration: underline; }
+
+.breadcrumb-sep { color: var(--texto-muted); }
+
+.breadcrumb-actual {
+    color: var(--texto-secundario);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.btn-volver {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--borde);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    color: var(--texto-secundario);
+    text-decoration: none;
+    background: var(--bg-card);
+    transition: all var(--transicion);
+}
+
+.btn-volver:hover {
+    background: var(--bg-principal);
+    color: var(--texto-principal);
+}
+
+.detalle-card {
+    background: var(--bg-card);
+    border: 1px solid var(--borde);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--sombra-card);
+}
+
+.detalle-card-header {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--borde);
+    background: var(--bg-principal);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--texto-principal);
+    display: flex;
+    align-items: center;
+}
+
+.detalle-card-body {
+    padding: 1.25rem;
+}
+
+.detalle-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.detalle-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.detalle-campo-ancho {
+    grid-column: 1 / -1;
+}
+
+.campo-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--texto-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.campo-valor {
+    font-size: 0.9rem;
+    color: var(--texto-principal);
+    line-height: 1.4;
+}
+
+/* Stock visual en detalle */
+.stock-num-grande {
+    font-size: 2.5rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    line-height: 1;
+}
+
+.alerta-detalle {
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.alerta-detalle-critica {
+    background: var(--color-critico-bg);
+    color: var(--color-critico);
+    border: 1px solid #FECACA;
+}
+
+.alerta-detalle-baja {
+    background: var(--color-bajo-bg);
+    color: var(--color-bajo);
+    border: 1px solid #FDE68A;
+}
+
+.alerta-detalle-normal {
+    background: var(--color-normal-bg);
+    color: var(--color-normal);
+    border: 1px solid #BBF7D0;
+}
+
+/* Precios en detalle */
+.precio-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0;
+}
+
+.precio-label {
+    font-size: 0.875rem;
+    color: var(--texto-secundario);
+}
+
+.precio-valor {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--texto-principal);
+    font-family: var(--font-mono);
+}
+
+.precio-divider {
+    height: 1px;
+    background: var(--borde-suave);
+}
+
+.precio-total { padding-top: 0.75rem; }
+
+.precio-destacado {
+    font-size: 1.3rem;
+    color: var(--color-morado);
+}
+
+/* Botones de acción en detalle */
+.btn-accion-detalle {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 0.875rem;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid var(--borde);
+    background: transparent;
+    cursor: pointer;
+    transition: all var(--transicion);
+    width: 100%;
+}
+
+.btn-accion-detalle:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-accion-editar { color: var(--color-bajo); }
+.btn-accion-editar:not(:disabled):hover {
+    background: var(--color-bajo-bg);
+    border-color: var(--color-bajo);
+}
+
+.btn-accion-eliminar { color: var(--color-critico); }
+.btn-accion-eliminar:not(:disabled):hover {
+    background: var(--color-critico-bg);
+    border-color: var(--color-critico);
+}
+
+.btn-accion-ver { color: var(--color-primario); }
+.btn-accion-ver:hover {
+    background: var(--color-primario-claro);
+    border-color: var(--color-primario);
+    color: var(--color-primario);
+}
+
+.btn-accion-neutral { color: var(--texto-secundario); }
+.btn-accion-neutral:hover {
+    background: var(--bg-principal);
+    color: var(--texto-principal);
+}
+
+/* ------ SEMANA 5: FORMULARIO ------ */
+
+.form-seccion {
+    background: var(--bg-card);
+    border: 1px solid var(--borde);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--sombra-card);
+}
+
+.form-seccion-header {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--borde);
+    background: var(--bg-principal);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--texto-principal);
+    display: flex;
+    align-items: center;
+}
+
+.form-seccion-body {
+    padding: 1.5rem 1.25rem;
+}
+
+.campo-grupo {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.campo-etiqueta {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--texto-secundario);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.campo-requerido {
+    color: var(--color-critico);
+    font-weight: 700;
+}
+
+.campo-opcional {
+    color: var(--texto-muted);
+    font-weight: 400;
+    text-transform: none;
+    font-size: 0.78rem;
+    letter-spacing: 0;
+}
+
+.campo-ayuda {
+    font-size: 0.75rem;
+    color: var(--texto-muted);
+    margin-top: 2px;
+}
+
+/* Input con prefijo $ o ícono */
+.input-con-prefijo {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-prefijo {
+    position: absolute;
+    left: 12px;
+    color: var(--texto-muted);
+    font-size: 0.9rem;
+    font-weight: 500;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.input-con-icono {
+    padding-left: 34px !important;
+}
+
+/* Estado de error en inputs */
+.input-error {
+    border-color: var(--color-critico) !important;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1) !important;
+}
+
+.campo-error-msg {
+    font-size: 0.78rem;
+    color: var(--color-critico);
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.campo-error-msg::before {
+    content: '⚠';
+    font-size: 0.7rem;
+}
+
+/* Preview del valor total */
+.valor-preview {
+    background: var(--color-morado-bg);
+    border: 1px solid #DDD6FE;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.valor-preview-label {
+    font-size: 0.875rem;
+    color: var(--color-morado);
+    font-weight: 500;
+}
+
+.valor-preview-num {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--color-morado);
+    font-family: var(--font-mono);
+}
+
+/* Botones del formulario */
+.btn-cancelar {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1.25rem;
+    border: 1px solid var(--borde);
+    border-radius: 10px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--texto-secundario);
+    text-decoration: none;
+    background: var(--bg-card);
+    transition: all var(--transicion);
+}
+
+.btn-cancelar:hover {
+    background: var(--bg-principal);
+    color: var(--texto-principal);
+}
+
+.btn-guardar {
+    padding: 0.5rem 1.5rem !important;
+    font-size: 0.875rem !important;
+    border-radius: 10px !important;
+}
+
 /* ------ RESPONSIVE ------ */
 @media (max-width: 576px) {
     .page-title {

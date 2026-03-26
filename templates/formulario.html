@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }}{% endblock %}
+
+{% block contenido %}
+
+{# ===== HEADER ===== #}
+<div class="page-header">
+    <div class="container-fluid px-4">
+
+        {# Breadcrumb #}
+        <nav class="breadcrumb-custom mb-2">
+            <a href="{{ url_for('inicio') }}">
+                <i class="bi bi-house-door me-1"></i>Inicio
+            </a>
+            <span class="breadcrumb-sep">/</span>
+            <a href="{{ url_for('lista_productos') }}">Productos</a>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-actual">{{ titulo }}</span>
+        </nav>
+
+        <div class="row align-items-center">
+            <div class="col">
+                <h1 class="page-title">{{ titulo }}</h1>
+                <p class="page-subtitle">
+                    {% if producto and producto.id is defined %}
+                        Modificando el producto #{{ "%03d"|format(producto.id) }}
+                    {% else %}
+                        Completa los campos para registrar un nuevo producto
+                    {% endif %}
+                </p>
+            </div>
+            <div class="col-auto">
+                <a href="{{ url_for('lista_productos') }}" class="btn-volver">
+                    <i class="bi bi-arrow-left me-1"></i>Cancelar
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid px-4 mt-4 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+
+            {# ===== FORMULARIO ===== #}
+            {#
+                action: a qué URL se envían los datos al hacer clic en Guardar.
+                method="POST": los datos van en el cuerpo de la petición (no en la URL).
+                    Usamos POST para enviar datos que modifican la BD, nunca GET.
+
+                Si producto tiene .id (es decir, es un objeto de BD, no un dict),
+                enviamos al endpoint de editar. Si no, al de crear.
+            #}
+            {% if producto and producto is not none and producto.__class__.__name__ == 'Producto' %}
+                {% set form_action = url_for('editar_producto', id=producto.id) %}
+            {% else %}
+                {% set form_action = url_for('nuevo_producto') %}
+            {% endif %}
+
+            <form method="POST" action="{{ form_action }}" novalidate id="form-producto">
+
+                {# ===== SECCIÓN 1: INFORMACIÓN BÁSICA ===== #}
+                <div class="form-seccion mb-4">
+                    <div class="form-seccion-header">
+                        <i class="bi bi-tag me-2"></i>Información básica
+                    </div>
+                    <div class="form-seccion-body">
+
+                        {# Campo: Nombre #}
+                        <div class="campo-grupo mb-3">
+                            <label for="nombre" class="campo-etiqueta">
+                                Nombre del producto <span class="campo-requerido">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                id="nombre"
+                                name="nombre"
+                                class="form-control input-custom"
+                                placeholder="Ej: Laptop Dell Inspiron 15"
+                                maxlength="100"
+                                required
+                                {# value: si estamos editando, muestra el valor actual #}
+                                {# Si producto es un dict (datos del form con error), también lo muestra #}
+                                value="{{ producto.nombre if producto else '' }}"
+                            >
+                            <div class="campo-ayuda">Máximo 100 caracteres</div>
+                        </div>
+
+                        {# Campo: Descripción #}
+                        <div class="campo-grupo mb-3">
+                            <label for="descripcion" class="campo-etiqueta">
+                                Descripción
+                                <span class="campo-opcional">(opcional)</span>
+                            </label>
+                            <textarea
+                                id="descripcion"
+                                name="descripcion"
+                                class="form-control input-custom"
+                                rows="3"
+                                placeholder="Describe las características del producto..."
+                            >{{ producto.descripcion if producto and producto.descripcion else '' }}</textarea>
+                            <div class="campo-ayuda">Una descripción clara ayuda a identificar el producto</div>
+                        </div>
+
+                        {# Campo: Categoría #}
+                        <div class="campo-grupo">
+                            <label for="categoria" class="campo-etiqueta">
+                                Categoría <span class="campo-requerido">*</span>
+                            </label>
+                            <select id="categoria" name="categoria" class="form-select input-custom">
+                                {% for cat in categorias %}
+                                <option value="{{ cat }}"
+                                    {# Seleccionar la categoría actual si estamos editando #}
+                                    {% if producto and producto.categoria == cat %}selected{% endif %}
+                                >
+                                    {{ cat }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                    </div>
+                </div>
+
+                {# ===== SECCIÓN 2: PRECIOS Y STOCK ===== #}
+                <div class="form-seccion mb-4">
+                    <div class="form-seccion-header">
+                        <i class="bi bi-currency-dollar me-2"></i>Precios y stock
+                    </div>
+                    <div class="form-seccion-body">
+
+                        <div class="row g-3">
+
+                            {# Campo: Precio #}
+                            <div class="col-12 col-md-6">
+                                <div class="campo-grupo">
+                                    <label for="precio" class="campo-etiqueta">
+                                        Precio unitario <span class="campo-requerido">*</span>
+                                    </label>
+                                    <div class="input-con-prefijo">
+                                        <span class="input-prefijo">$</span>
+                                        <input
+                                            type="number"
+                                            id="precio"
+                                            name="precio"
+                                            class="form-control input-custom input-con-icono"
+                                            placeholder="0"
+                                            min="0"
+                                            step="0.01"
+                                            required
+                                            value="{{ producto.precio if producto else '' }}"
+                                        >
+                                    </div>
+                                    <div class="campo-ayuda">Precio de venta o costo del producto</div>
+                                </div>
+                            </div>
+
+                            {# Campo: Cantidad #}
+                            <div class="col-12 col-md-6">
+                                <div class="campo-grupo">
+                                    <label for="cantidad" class="campo-etiqueta">
+                                        Cantidad en stock <span class="campo-requerido">*</span>
+                                    </label>
+                                    <div class="input-con-prefijo">
+                                        <span class="input-prefijo">
+                                            <i class="bi bi-boxes" style="font-size:0.875rem;"></i>
+                                        </span>
+                                        <input
+                                            type="number"
+                                            id="cantidad"
+                                            name="cantidad"
+                                            class="form-control input-custom input-con-icono"
+                                            placeholder="0"
+                                            min="0"
+                                            step="1"
+                                            required
+                                            value="{{ producto.cantidad if producto else '' }}"
+                                        >
+                                    </div>
+                                    <div class="campo-ayuda">Unidades disponibles actualmente</div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        {# Preview del valor total — se actualiza con JavaScript #}
+                        <div class="valor-preview mt-3" id="valor-preview" style="display:none;">
+                            <span class="valor-preview-label">Valor total del stock:</span>
+                            <span class="valor-preview-num" id="valor-total-preview">$0</span>
+                        </div>
+
+                    </div>
+                </div>
+
+                {# ===== BOTONES DE ACCIÓN ===== #}
+                <div class="d-flex gap-3 justify-content-end">
+                    <a href="{{ url_for('lista_productos') }}" class="btn-cancelar">
+                        <i class="bi bi-x-lg me-1"></i>Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-agregar btn-guardar" id="btn-guardar">
+                        <i class="bi bi-check-lg me-1"></i>
+                        {% if producto and producto.__class__.__name__ == 'Producto' %}
+                            Guardar cambios
+                        {% else %}
+                            Crear producto
+                        {% endif %}
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts_extra %}
+<script>
+// ============================================================
+// JavaScript del formulario
+// Calcula el valor total en tiempo real mientras el usuario
+// escribe el precio y la cantidad.
+// ============================================================
+
+const inputPrecio   = document.getElementById('precio');
+const inputCantidad = document.getElementById('cantidad');
+const preview       = document.getElementById('valor-preview');
+const previewNum    = document.getElementById('valor-total-preview');
+
+function actualizarPreview() {
+    // Parseamos los valores. Si están vacíos, usamos 0.
+    const precio   = parseFloat(inputPrecio.value)   || 0;
+    const cantidad = parseInt(inputCantidad.value)   || 0;
+    const total    = precio * cantidad;
+
+    if (precio > 0 || cantidad > 0) {
+        preview.style.display = 'flex';
+        // toLocaleString formatea el número con puntos de miles
+        previewNum.textContent = '$' + total.toLocaleString('es-CO');
+    } else {
+        preview.style.display = 'none';
+    }
+}
+
+// Escuchamos cambios en ambos campos
+inputPrecio.addEventListener('input', actualizarPreview);
+inputCantidad.addEventListener('input', actualizarPreview);
+
+// Si estamos editando, mostramos el preview con los valores actuales
+actualizarPreview();
+
+
+// ============================================================
+// Validación del formulario antes de enviar
+// Esto es validación del lado del cliente (navegador).
+// La validación real está en Python (app.py) — esta es extra.
+// ============================================================
+
+document.getElementById('form-producto').addEventListener('submit', function(e) {
+    const nombre   = document.getElementById('nombre').value.trim();
+    const precio   = parseFloat(document.getElementById('precio').value);
+    const cantidad = parseInt(document.getElementById('cantidad').value);
+
+    let hayError = false;
+
+    // Limpiar errores anteriores
+    document.querySelectorAll('.campo-error-msg').forEach(el => el.remove());
+    document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+
+    if (!nombre) {
+        mostrarError('nombre', 'El nombre es obligatorio');
+        hayError = true;
+    }
+
+    if (isNaN(precio) || precio < 0) {
+        mostrarError('precio', 'Ingresa un precio válido (mayor o igual a 0)');
+        hayError = true;
+    }
+
+    if (isNaN(cantidad) || cantidad < 0) {
+        mostrarError('cantidad', 'Ingresa una cantidad válida (mayor o igual a 0)');
+        hayError = true;
+    }
+
+    if (hayError) {
+        e.preventDefault(); // Detiene el envío del formulario
+    } else {
+        // Deshabilitamos el botón para evitar doble clic accidental
+        document.getElementById('btn-guardar').disabled = true;
+        document.getElementById('btn-guardar').innerHTML =
+            '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
+    }
+});
+
+function mostrarError(campoId, mensaje) {
+    const campo = document.getElementById(campoId);
+    campo.classList.add('input-error');
+    const msg = document.createElement('div');
+    msg.className = 'campo-error-msg';
+    msg.textContent = mensaje;
+    campo.parentNode.appendChild(msg);
+}
+</script>
+{% endblock %}
