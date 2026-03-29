@@ -96,6 +96,66 @@ class Producto(db.Model):
         return self.precio * self.cantidad
 
 
+# ============================================================
+# SEMANA 6 — MODELO DE MOVIMIENTOS DE STOCK
+# ============================================================
+
+class Movimiento(db.Model):
+    """
+    Tabla 'movimiento' — registra cada vez que el stock cambia.
+
+    Cada vez que alguien edita la cantidad de un producto,
+    guardamos un registro aquí con:
+    - qué producto cambió
+    - cuánto cambió (positivo = entrada, negativo = salida)
+    - la cantidad antes y después del cambio
+    - cuándo ocurrió
+
+    Esto nos permite ver el historial completo y calcular
+    las alertas predictivas en semana 11.
+    """
+    __tablename__ = 'movimiento'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Llave foránea: referencia al producto que cambió
+    # ForeignKey('producto.id') le dice a SQLAlchemy que este número
+    # corresponde al id de la tabla producto
+    producto_id = db.Column(db.Integer, db.ForeignKey('producto.id'), nullable=False)
+
+    # Tipo de movimiento para clasificar
+    # 'entrada'  = llegó más stock (compra, devolución)
+    # 'salida'   = salió stock (venta, pérdida)
+    # 'ajuste'   = corrección manual
+    # 'creacion' = cuando se registra el producto por primera vez
+    tipo = db.Column(db.String(20), nullable=False, default='ajuste')
+
+    # Cuántas unidades cambiaron
+    # Positivo (+10) = entraron 10 unidades
+    # Negativo (-5)  = salieron 5 unidades
+    cantidad_cambio = db.Column(db.Integer, nullable=False)
+
+    # Stock antes y después del cambio (útil para auditoría)
+    cantidad_anterior = db.Column(db.Integer, nullable=False)
+    cantidad_nueva    = db.Column(db.Integer, nullable=False)
+
+    # Nota opcional del usuario explicando por qué cambió
+    nota = db.Column(db.String(200), nullable=True)
+
+    # Cuándo ocurrió el movimiento
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # relationship() permite acceder al producto desde el movimiento:
+    # movimiento.producto.nombre  (sin hacer otra consulta a la BD)
+    # backref='movimientos' permite acceder desde el producto:
+    # producto.movimientos  (lista de todos sus movimientos)
+    producto = db.relationship('Producto', backref='movimientos')
+
+    def __repr__(self):
+        signo = '+' if self.cantidad_cambio >= 0 else ''
+        return f'<Movimiento {self.producto_id} {signo}{self.cantidad_cambio}>'
+
+
 # ------ RUTAS (PÁGINAS DE LA APP) ------
 
 # Una "ruta" es la URL que escribe el usuario en el navegador.
@@ -324,6 +384,17 @@ def nuevo_producto():
         # .commit() ejecuta TODOS los cambios de una vez en la BD.
         # Si algo falla antes del commit, nada se guarda (es seguro).
         db.session.add(nuevo)
+        db.session.flush()  # flush() asigna el ID sin hacer commit todavía
+
+        # Registramos el movimiento inicial de creación
+        if nuevo.cantidad > 0:
+            registrar_movimiento(
+                nuevo,
+                cantidad_anterior=0,
+                tipo='creacion',
+                nota='Stock inicial al registrar el producto'
+            )
+
         db.session.commit()
 
         # flash() guarda un mensaje que se muestra en la SIGUIENTE página.
@@ -391,18 +462,24 @@ def editar_producto(id):
                                    producto=producto)
 
         # ------ ACTUALIZAR EL PRODUCTO EXISTENTE ------
-        # A diferencia de crear, aquí modificamos el objeto que ya existe.
-        # SQLAlchemy detecta los cambios automáticamente al hacer commit().
+        # Guardamos la cantidad anterior ANTES de modificar
+        cantidad_anterior = producto.cantidad
 
         producto.nombre      = nombre
         producto.descripcion = descripcion
         producto.precio      = precio
         producto.cantidad    = cantidad
         producto.categoria   = categoria
-        # Nota: NO tocamos fecha_creacion, esa queda igual
 
-        # No necesitamos db.session.add() porque el producto
-        # ya está "rastreado" por SQLAlchemy (lo obtuvimos con .get_or_404)
+        # Si la cantidad cambió, registramos el movimiento
+        if cantidad != cantidad_anterior:
+            registrar_movimiento(
+                producto,
+                cantidad_anterior,
+                tipo='ajuste',
+                nota='Modificación desde formulario de edición'
+            )
+
         db.session.commit()
 
         flash(f'✅ Producto "{nombre}" actualizado correctamente.', 'success')
@@ -413,6 +490,158 @@ def editar_producto(id):
                            titulo=f'Editar: {producto.nombre}',
                            categorias=CATEGORIAS,
                            producto=producto)
+
+
+# ============================================================
+# SEMANA 6 — FUNCIÓN HELPER PARA REGISTRAR MOVIMIENTOS
+# ============================================================
+
+def registrar_movimiento(producto, cantidad_anterior, tipo='ajuste', nota=None):
+    """
+    Función auxiliar que crea un registro en la tabla Movimiento.
+
+    La llamamos cada vez que el stock de un producto cambia:
+    - Al editar un producto (semana 5, ahora con registro)
+    - Al crear un producto nuevo
+    - Al eliminar (registramos antes de borrar)
+
+    Parámetros:
+        producto:          el objeto Producto que cambió
+        cantidad_anterior: cuánto tenía ANTES del cambio
+        tipo:              'creacion', 'ajuste', 'entrada', 'salida'
+        nota:              texto explicativo opcional
+    """
+    cambio = producto.cantidad - cantidad_anterior
+
+    # Solo registramos si hubo un cambio real en la cantidad
+    # (no registramos si solo cambió el nombre o el precio)
+    if cambio == 0 and tipo not in ('creacion',):
+        return
+
+    movimiento = Movimiento(
+        producto_id       = producto.id,
+        tipo              = tipo,
+        cantidad_cambio   = cambio,
+        cantidad_anterior = cantidad_anterior,
+        cantidad_nueva    = producto.cantidad,
+        nota              = nota
+    )
+    db.session.add(movimiento)
+    # Nota: NO hacemos commit aquí — lo hace la función que nos llama.
+    # Así ambos cambios (producto + movimiento) se guardan juntos.
+
+
+# ============================================================
+# SEMANA 6 — ELIMINAR PRODUCTO
+# ============================================================
+
+@app.route('/productos/eliminar/<int:id>', methods=['POST'])
+def eliminar_producto(id):
+    """
+    SEMANA 6 — Elimina un producto de la base de datos.
+
+    IMPORTANTE: Solo aceptamos POST, nunca GET.
+    Si aceptáramos GET, alguien podría enviarte un link como:
+        <img src="/productos/eliminar/5">
+    y al cargar la imagen, ¡borraría el producto 5 sin querer!
+    Con POST solo se puede hacer desde un formulario o JS intencional.
+
+    La confirmación real sucede en el navegador (JavaScript),
+    pero aquí en el servidor también verificamos que el producto exista.
+    """
+    producto = Producto.query.get_or_404(id)
+    nombre   = producto.nombre  # Guardamos el nombre antes de borrar
+
+    # Antes de eliminar, borramos sus movimientos también
+    # (porque tienen una llave foránea que apunta a este producto)
+    Movimiento.query.filter_by(producto_id=id).delete()
+
+    db.session.delete(producto)
+    db.session.commit()
+
+    flash(f'🗑️ Producto "{nombre}" eliminado correctamente.', 'warning')
+    return redirect(url_for('lista_productos'))
+
+
+# ============================================================
+# SEMANA 6 — AJUSTE RÁPIDO DE STOCK
+# ============================================================
+
+@app.route('/productos/ajustar-stock/<int:id>', methods=['POST'])
+def ajustar_stock(id):
+    """
+    SEMANA 6 — Ajusta el stock de un producto sin ir al formulario completo.
+
+    Recibe dos campos del formulario:
+    - 'operacion': 'sumar' o 'restar'
+    - 'cantidad_ajuste': cuántas unidades sumar o restar
+
+    Esto es más rápido que abrir el formulario de edición completo
+    solo para cambiar 5 unidades de stock.
+    """
+    producto = Producto.query.get_or_404(id)
+
+    try:
+        cantidad_ajuste = int(request.form.get('cantidad_ajuste', 0))
+    except ValueError:
+        flash('❌ La cantidad debe ser un número entero.', 'danger')
+        return redirect(url_for('detalle_producto', id=id))
+
+    if cantidad_ajuste <= 0:
+        flash('❌ La cantidad del ajuste debe ser mayor a 0.', 'danger')
+        return redirect(url_for('detalle_producto', id=id))
+
+    operacion        = request.form.get('operacion', 'sumar')
+    cantidad_anterior = producto.cantidad
+
+    if operacion == 'sumar':
+        producto.cantidad += cantidad_ajuste
+        tipo = 'entrada'
+        nota = f'Entrada de {cantidad_ajuste} unidades (ajuste rápido)'
+    else:
+        # Verificamos que no quede en negativo
+        if producto.cantidad - cantidad_ajuste < 0:
+            flash(f'❌ No puedes restar {cantidad_ajuste} unidades. Solo hay {producto.cantidad} en stock.', 'danger')
+            return redirect(url_for('detalle_producto', id=id))
+        producto.cantidad -= cantidad_ajuste
+        tipo = 'salida'
+        nota = f'Salida de {cantidad_ajuste} unidades (ajuste rápido)'
+
+    # Registramos el movimiento ANTES del commit
+    registrar_movimiento(producto, cantidad_anterior, tipo=tipo, nota=nota)
+    db.session.commit()
+
+    flash(f'✅ Stock actualizado: {cantidad_anterior} → {producto.cantidad} unidades.', 'success')
+    return redirect(url_for('detalle_producto', id=id))
+
+
+# ============================================================
+# SEMANA 6 — HISTORIAL DE MOVIMIENTOS
+# ============================================================
+
+@app.route('/historial')
+def historial():
+    """
+    SEMANA 6 — Muestra el historial completo de movimientos de stock.
+
+    Útil para auditoría: ver qué cambió, cuándo y cuánto.
+    En semana 9 generaremos un PDF con este historial.
+    """
+    pagina    = request.args.get('pagina', 1, type=int)
+    tipo_filtro = request.args.get('tipo', '')
+
+    consulta = Movimiento.query
+
+    if tipo_filtro:
+        consulta = consulta.filter(Movimiento.tipo == tipo_filtro)
+
+    # Ordenamos del más reciente al más antiguo
+    movimientos = consulta.order_by(Movimiento.fecha.desc())\
+                          .paginate(page=pagina, per_page=20, error_out=False)
+
+    return render_template('historial.html',
+                           movimientos=movimientos,
+                           tipo_filtro=tipo_filtro)
 
 
 @app.route('/dashboard')

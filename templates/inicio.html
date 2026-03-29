@@ -1,9 +1,9 @@
 {# ============================================================ #}
-{# inicio.html — Página principal del sistema                   #}
+{# inicio.html — Página principal del sistema #}
 {# ============================================================ #}
 {# extends: le dice a Jinja2 que use base.html como "esqueleto" #}
-{# Todo el contenido va dentro de bloques {% block %} que       #}
-{# reemplazan los {% block %} vacíos del base.html              #}
+{# Todo el contenido va dentro de bloques {% block %} que #}
+{# reemplazan los {% block %} vacíos del base.html #}
 {# ============================================================ #}
 {% extends "base.html" %}
 
@@ -102,8 +102,7 @@
 <div class="container-fluid px-4 mt-4">
     <div class="row g-4">
 
-        {# --- Alertas críticas (stock < 5) --- #}
-        <div class="col-12 col-lg-6">
+        {# --- Alertas críticas (stock < 5) --- #} <div class="col-12 col-lg-6">
             <div class="card-seccion">
                 <div class="card-seccion-header">
                     <div class="d-flex align-items-center gap-2">
@@ -116,66 +115,66 @@
 
                     {# Si hay alertas, las mostramos. Si no, mensaje de tranquilidad. #}
                     {% if alertas_criticas %}
-                        {% for producto in alertas_criticas %}
-                        <div class="alerta-item alerta-critica">
-                            <div class="alerta-info">
-                                <span class="alerta-nombre">{{ producto.nombre }}</span>
-                                <span class="alerta-categoria">{{ producto.categoria }}</span>
-                            </div>
-                            <div class="alerta-stock">
-                                <span class="stock-numero stock-critico">{{ producto.cantidad }}</span>
-                                <span class="stock-label">unid.</span>
-                            </div>
+                    {% for producto in alertas_criticas %}
+                    <div class="alerta-item alerta-critica">
+                        <div class="alerta-info">
+                            <span class="alerta-nombre">{{ producto.nombre }}</span>
+                            <span class="alerta-categoria">{{ producto.categoria }}</span>
                         </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="alerta-vacia">
-                            <i class="bi bi-check-circle-fill text-success fs-4"></i>
-                            <p class="mb-0">¡Todo en orden! Sin alertas críticas.</p>
+                        <div class="alerta-stock">
+                            <span class="stock-numero stock-critico">{{ producto.cantidad }}</span>
+                            <span class="stock-label">unid.</span>
                         </div>
-                    {% endif %}
-
-                </div>
-            </div>
-        </div>
-
-        {# --- Alertas de stock bajo (entre 5 y 9) --- #}
-        <div class="col-12 col-lg-6">
-            <div class="card-seccion">
-                <div class="card-seccion-header">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="indicador-amarillo"></span>
-                        <h5 class="mb-0">Stock Bajo</h5>
                     </div>
-                    <span class="badge bg-warning text-dark">{{ alertas_bajas | length }}</span>
-                </div>
-                <div class="card-seccion-body">
-
-                    {% if alertas_bajas %}
-                        {% for producto in alertas_bajas %}
-                        <div class="alerta-item alerta-baja">
-                            <div class="alerta-info">
-                                <span class="alerta-nombre">{{ producto.nombre }}</span>
-                                <span class="alerta-categoria">{{ producto.categoria }}</span>
-                            </div>
-                            <div class="alerta-stock">
-                                <span class="stock-numero stock-bajo">{{ producto.cantidad }}</span>
-                                <span class="stock-label">unid.</span>
-                            </div>
-                        </div>
-                        {% endfor %}
+                    {% endfor %}
                     {% else %}
-                        <div class="alerta-vacia">
-                            <i class="bi bi-check-circle-fill text-success fs-4"></i>
-                            <p class="mb-0">¡Stock saludable! Sin productos en nivel bajo.</p>
-                        </div>
+                    <div class="alerta-vacia">
+                        <i class="bi bi-check-circle-fill text-success fs-4"></i>
+                        <p class="mb-0">¡Todo en orden! Sin alertas críticas.</p>
+                    </div>
                     {% endif %}
 
                 </div>
             </div>
-        </div>
-
     </div>
+
+    {# --- Alertas de stock bajo (entre 5 y 9) --- #}
+    <div class="col-12 col-lg-6">
+        <div class="card-seccion">
+            <div class="card-seccion-header">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="indicador-amarillo"></span>
+                    <h5 class="mb-0">Stock Bajo</h5>
+                </div>
+                <span class="badge bg-warning text-dark">{{ alertas_bajas | length }}</span>
+            </div>
+            <div class="card-seccion-body">
+
+                {% if alertas_bajas %}
+                {% for producto in alertas_bajas %}
+                <div class="alerta-item alerta-baja">
+                    <div class="alerta-info">
+                        <span class="alerta-nombre">{{ producto.nombre }}</span>
+                        <span class="alerta-categoria">{{ producto.categoria }}</span>
+                    </div>
+                    <div class="alerta-stock">
+                        <span class="stock-numero stock-bajo">{{ producto.cantidad }}</span>
+                        <span class="stock-label">unid.</span>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="alerta-vacia">
+                    <i class="bi bi-check-circle-fill text-success fs-4"></i>
+                    <p class="mb-0">¡Stock saludable! Sin productos en nivel bajo.</p>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+
+</div>
 </div>
 
 {# ===== ACCESOS RÁPIDOS ===== #}
@@ -189,10 +188,9 @@
             </a>
         </div>
         <div class="col-6 col-md-3">
-            <a href="#" class="acceso-rapido acceso-deshabilitado">
+            <a href="{{ url_for('nuevo_producto') }}" class="acceso-rapido">
                 <i class="bi bi-plus-circle"></i>
                 <span>Nuevo producto</span>
-                <small class="badge-pronto">Semana 5</small>
             </a>
         </div>
         <div class="col-6 col-md-3">

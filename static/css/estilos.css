@@ -1137,6 +1137,77 @@ code {
     border-radius: 10px !important;
 }
 
+/* ------ SEMANA 6: AJUSTE DE STOCK Y HISTORIAL ------ */
+
+.btn-operacion {
+    flex: 1;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--borde);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    background: transparent;
+    color: var(--texto-secundario);
+    cursor: pointer;
+    transition: all var(--transicion);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.btn-operacion.activo {
+    background: var(--color-primario-claro);
+    color: var(--color-primario);
+    border-color: var(--color-primario);
+}
+
+.btn-operacion:hover:not(.activo) {
+    background: var(--bg-principal);
+}
+
+/* Cambios de stock en historial */
+.cambio-positivo {
+    color: var(--color-normal);
+    font-weight: 700;
+}
+
+.cambio-negativo {
+    color: var(--color-critico);
+    font-weight: 700;
+}
+
+.cambio-neutro {
+    color: var(--texto-muted);
+}
+
+/* Botones filtro tipo en historial */
+.btn-filtro-tipo {
+    padding: 0.35rem 0.875rem;
+    border: 1px solid var(--borde);
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-decoration: none;
+    color: var(--texto-secundario);
+    background: var(--bg-card);
+    transition: all var(--transicion);
+    display: inline-flex;
+    align-items: center;
+}
+
+.btn-filtro-tipo:hover,
+.btn-filtro-tipo.activo {
+    background: var(--color-primario-claro);
+    color: var(--color-primario);
+    border-color: var(--color-primario);
+}
+
+.btn-filtro-tipo.entrada.activo  { background: var(--color-normal-bg); color: var(--color-normal); border-color: var(--color-normal); }
+.btn-filtro-tipo.salida.activo   { background: var(--color-critico-bg); color: var(--color-critico); border-color: var(--color-critico); }
+.btn-filtro-tipo.ajuste.activo   { background: var(--color-bajo-bg); color: var(--color-bajo); border-color: var(--color-bajo); }
+.btn-filtro-tipo.creacion.activo { background: var(--color-morado-bg); color: var(--color-morado); border-color: var(--color-morado); }
+
 /* ------ RESPONSIVE ------ */
 @media (max-width: 576px) {
     .page-title {

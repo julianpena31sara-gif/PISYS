@@ -36,11 +36,10 @@
                 <div class="input-buscar">
                     <i class="bi bi-search icono-buscar"></i>
                     <input type="text" name="buscar" class="form-control input-custom"
-                        placeholder="Escribe el nombre del producto..."
-                        value="{{ buscar }}" autocomplete="off">
+                        placeholder="Escribe el nombre del producto..." value="{{ buscar }}" autocomplete="off">
                     {% if buscar %}
-                    <a href="{{ url_for('lista_productos', categoria=categoria_activa) }}"
-                       class="btn-limpiar" title="Limpiar búsqueda">
+                    <a href="{{ url_for('lista_productos', categoria=categoria_activa) }}" class="btn-limpiar"
+                        title="Limpiar búsqueda">
                         <i class="bi bi-x-lg"></i>
                     </a>
                     {% endif %}
@@ -54,7 +53,7 @@
                         Todas las categorías
                     </option>
                     {% for cat in categorias %}
-                    <option value="{{ cat }}" {% if cat == categoria_activa %}selected{% endif %}>
+                    <option value="{{ cat }}" {% if cat==categoria_activa %}selected{% endif %}>
                         {{ cat }}
                     </option>
                     {% endfor %}
@@ -121,7 +120,7 @@
                         </td>
                         <td>
                             <a href="{{ url_for('lista_productos', categoria=producto.categoria) }}"
-                               class="badge-categoria">{{ producto.categoria }}</a>
+                                class="badge-categoria">{{ producto.categoria }}</a>
                         </td>
                         <td class="text-end mono-font">${{ "{:,.0f}".format(producto.precio) }}</td>
                         <td class="text-center">
@@ -132,25 +131,32 @@
                         <td class="text-end mono-font">${{ "{:,.0f}".format(producto.valor_total()) }}</td>
                         <td class="text-center">
                             {% if producto.estado_stock() == 'critico' %}
-                                <span class="badge bg-danger">Crítico</span>
+                            <span class="badge bg-danger">Crítico</span>
                             {% elif producto.estado_stock() == 'bajo' %}
-                                <span class="badge bg-warning text-dark">Bajo</span>
+                            <span class="badge bg-warning text-dark">Bajo</span>
                             {% else %}
-                                <span class="badge bg-success">Normal</span>
+                            <span class="badge bg-success">Normal</span>
                             {% endif %}
                         </td>
                         <td class="text-center">
                             <div class="d-flex gap-1 justify-content-center">
-                                <a href="{{ url_for('detalle_producto', id=producto.id) }}"
-                                   class="btn-accion btn-ver" title="Ver detalle">
+                                <a href="{{ url_for('detalle_producto', id=producto.id) }}" class="btn-accion btn-ver"
+                                    title="Ver detalle">
                                     <i class="bi bi-eye"></i>
                                 </a>
-                                <button class="btn-accion btn-editar" title="Editar (Semana 5)" disabled>
+                                <a href="{{ url_for('editar_producto', id=producto.id) }}" class="btn-accion btn-editar"
+                                    title="Editar producto">
                                     <i class="bi bi-pencil"></i>
-                                </button>
-                                <button class="btn-accion btn-eliminar" title="Eliminar (Semana 6)" disabled>
+                                </a>
+                                <button class="btn-accion btn-eliminar" title="Eliminar producto"
+                                    onclick="confirmarEliminarLista({{ producto.id }}, '{{ producto.nombre }}')">
                                     <i class="bi bi-trash3"></i>
                                 </button>
+
+                                {# Formulario oculto para el eliminar con POST #}
+                                <form id="form-eliminar-{{ producto.id }}" method="POST"
+                                    action="{{ url_for('eliminar_producto', id=producto.id) }}" style="display:none;">
+                                </form>
                             </div>
                         </td>
                     </tr>
@@ -171,27 +177,27 @@
             <li>
                 {% if productos.has_prev %}
                 <a href="{{ url_for('lista_productos', pagina=productos.prev_num, buscar=buscar, categoria=categoria_activa) }}"
-                   class="btn-pagina"><i class="bi bi-chevron-left"></i> Anterior</a>
+                    class="btn-pagina"><i class="bi bi-chevron-left"></i> Anterior</a>
                 {% else %}
                 <span class="btn-pagina disabled"><i class="bi bi-chevron-left"></i> Anterior</span>
                 {% endif %}
             </li>
             {% for num_pagina in productos.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                {% if num_pagina %}
-                    <li>
-                        <a href="{{ url_for('lista_productos', pagina=num_pagina, buscar=buscar, categoria=categoria_activa) }}"
-                           class="btn-pagina {% if num_pagina == productos.page %}btn-pagina-activa{% endif %}">
-                            {{ num_pagina }}
-                        </a>
-                    </li>
-                {% else %}
-                    <li><span class="btn-pagina disabled">…</span></li>
-                {% endif %}
+            {% if num_pagina %}
+            <li>
+                <a href="{{ url_for('lista_productos', pagina=num_pagina, buscar=buscar, categoria=categoria_activa) }}"
+                    class="btn-pagina {% if num_pagina == productos.page %}btn-pagina-activa{% endif %}">
+                    {{ num_pagina }}
+                </a>
+            </li>
+            {% else %}
+            <li><span class="btn-pagina disabled">…</span></li>
+            {% endif %}
             {% endfor %}
             <li>
                 {% if productos.has_next %}
                 <a href="{{ url_for('lista_productos', pagina=productos.next_num, buscar=buscar, categoria=categoria_activa) }}"
-                   class="btn-pagina">Siguiente <i class="bi bi-chevron-right"></i></a>
+                    class="btn-pagina">Siguiente <i class="bi bi-chevron-right"></i></a>
                 {% else %}
                 <span class="btn-pagina disabled">Siguiente <i class="bi bi-chevron-right"></i></span>
                 {% endif %}
@@ -205,15 +211,22 @@
         <i class="bi bi-search fs-1 text-muted"></i>
         <h4 class="mt-3">No se encontraron productos</h4>
         {% if buscar or categoria_activa %}
-            <p class="text-muted">
-                Intenta con otros términos o
-                <a href="{{ url_for('lista_productos') }}">ver todos los productos</a>.
-            </p>
+        <p class="text-muted">
+            Intenta con otros términos o
+            <a href="{{ url_for('lista_productos') }}">ver todos los productos</a>.
+        </p>
         {% else %}
-            <p class="text-muted">Ejecuta <code>python seed.py</code> para cargar datos de prueba.</p>
+        <p class="text-muted">Ejecuta <code>python seed.py</code> para cargar datos de prueba.</p>
         {% endif %}
     </div>
     {% endif %}
 
 </div>
+<script>
+function confirmarEliminarLista(id, nombre) {
+    if (confirm('¿Eliminar "' + nombre + '"?\n\nEsta acción no se puede deshacer.')) {
+        document.getElementById('form-eliminar-' + id).submit();
+    }
+}
+</script>
 {% endblock %}

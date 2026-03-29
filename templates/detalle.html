@@ -213,11 +213,17 @@
                         Editar producto
                     </a>
 
-                    <button class="btn-accion-detalle btn-accion-eliminar" disabled>
-                        <i class="bi bi-trash3 me-2"></i>
-                        Eliminar producto
-                        <span class="badge bg-secondary ms-auto" style="font-size:0.65rem;">Semana 6</span>
-                    </button>
+                    {# Formulario oculto para eliminar con POST #}
+                    <form method="POST"
+                          action="{{ url_for('eliminar_producto', id=producto.id) }}"
+                          id="form-eliminar">
+                        <button type="button"
+                                class="btn-accion-detalle btn-accion-eliminar w-100"
+                                onclick="confirmarEliminar('{{ producto.nombre }}')">
+                            <i class="bi bi-trash3 me-2"></i>
+                            Eliminar producto
+                        </button>
+                    </form>
 
                     <a href="{{ url_for('lista_productos', categoria=producto.categoria) }}"
                        class="btn-accion-detalle btn-accion-ver">
@@ -225,12 +231,48 @@
                         Ver más de "{{ producto.categoria }}"
                     </a>
 
-                    <a href="{{ url_for('lista_productos') }}"
+                    <a href="{{ url_for('historial') }}"
                        class="btn-accion-detalle btn-accion-neutral">
-                        <i class="bi bi-list-ul me-2"></i>
-                        Ver todos los productos
+                        <i class="bi bi-clock-history me-2"></i>
+                        Ver historial
                     </a>
 
+                </div>
+            </div>
+
+            {# ===== AJUSTE RÁPIDO DE STOCK ===== #}
+            <div class="detalle-card mt-4">
+                <div class="detalle-card-header">
+                    <i class="bi bi-sliders me-2"></i>Ajuste rápido de stock
+                </div>
+                <div class="detalle-card-body">
+                    <p style="font-size:0.82rem; color: var(--texto-secundario); margin-bottom: 1rem;">
+                        Suma o resta unidades sin abrir el formulario completo.
+                    </p>
+                    <form method="POST" action="{{ url_for('ajustar_stock', id=producto.id) }}">
+                        <div class="d-flex gap-2 mb-3">
+                            {# Botones sumar / restar #}
+                            <button type="button" class="btn-operacion activo" id="btn-sumar"
+                                    onclick="setOperacion('sumar')">
+                                <i class="bi bi-plus-lg"></i> Entrada
+                            </button>
+                            <button type="button" class="btn-operacion" id="btn-restar"
+                                    onclick="setOperacion('restar')">
+                                <i class="bi bi-dash-lg"></i> Salida
+                            </button>
+                            {# Campo oculto que guarda la operación elegida #}
+                            <input type="hidden" name="operacion" id="operacion-hidden" value="sumar">
+                        </div>
+                        <div class="d-flex gap-2 align-items-center">
+                            <input type="number" name="cantidad_ajuste"
+                                   class="form-control input-custom"
+                                   placeholder="Cantidad" min="1" step="1" required
+                                   style="max-width: 120px;">
+                            <button type="submit" class="btn btn-agregar" style="height:40px;">
+                                Aplicar
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
@@ -238,4 +280,22 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+// Confirmación antes de eliminar
+function confirmarEliminar(nombre) {
+    if (confirm('¿Estás seguro de que quieres eliminar "' + nombre + '"?\n\nEsta acción no se puede deshacer.')) {
+        document.getElementById('form-eliminar').submit();
+    }
+}
+
+// Ajuste de stock: toggle entre sumar y restar
+function setOperacion(op) {
+    document.getElementById('operacion-hidden').value = op;
+    document.getElementById('btn-sumar').classList.toggle('activo', op === 'sumar');
+    document.getElementById('btn-restar').classList.toggle('activo', op === 'restar');
+}
+</script>
 {% endblock %}

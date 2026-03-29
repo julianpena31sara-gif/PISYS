@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block titulo %}Historial de Movimientos{% endblock %}
+
+{% block contenido %}
+
+<div class="page-header">
+    <div class="container-fluid px-4">
+        <div class="row align-items-center">
+            <div class="col">
+                <h1 class="page-title">Historial de Movimientos</h1>
+                <p class="page-subtitle">Registro de todos los cambios de stock</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid px-4 mt-4 mb-5">
+
+    {# Filtros por tipo #}
+    <div class="d-flex gap-2 mb-4 flex-wrap">
+        <a href="{{ url_for('historial') }}"
+           class="btn-filtro-tipo {% if not tipo_filtro %}activo{% endif %}">
+            Todos
+        </a>
+        <a href="{{ url_for('historial', tipo='entrada') }}"
+           class="btn-filtro-tipo entrada {% if tipo_filtro == 'entrada' %}activo{% endif %}">
+            <i class="bi bi-arrow-down-circle me-1"></i>Entradas
+        </a>
+        <a href="{{ url_for('historial', tipo='salida') }}"
+           class="btn-filtro-tipo salida {% if tipo_filtro == 'salida' %}activo{% endif %}">
+            <i class="bi bi-arrow-up-circle me-1"></i>Salidas
+        </a>
+        <a href="{{ url_for('historial', tipo='ajuste') }}"
+           class="btn-filtro-tipo ajuste {% if tipo_filtro == 'ajuste' %}activo{% endif %}">
+            <i class="bi bi-sliders me-1"></i>Ajustes
+        </a>
+        <a href="{{ url_for('historial', tipo='creacion') }}"
+           class="btn-filtro-tipo creacion {% if tipo_filtro == 'creacion' %}activo{% endif %}">
+            <i class="bi bi-plus-circle me-1"></i>Creaciones
+        </a>
+    </div>
+
+    {% if movimientos.items %}
+    <div class="tabla-container">
+        <div class="tabla-header">
+            <span><i class="bi bi-clock-history me-2"></i>{{ movimientos.total }} movimiento(s)</span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table tabla-productos mb-0">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Producto</th>
+                        <th class="text-center">Tipo</th>
+                        <th class="text-center">Antes</th>
+                        <th class="text-center">Cambio</th>
+                        <th class="text-center">Después</th>
+                        <th>Nota</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mov in movimientos.items %}
+                    <tr class="fila-producto">
+                        <td class="mono-font" style="font-size:0.8rem; color: var(--texto-secundario);">
+                            {{ mov.fecha.strftime('%d/%m/%Y %H:%M') }}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('detalle_producto', id=mov.producto_id) }}"
+                               style="text-decoration:none; color: var(--color-primario); font-weight:500;">
+                                {{ mov.producto.nombre }}
+                            </a>
+                        </td>
+                        <td class="text-center">
+                            {% if mov.tipo == 'entrada' %}
+                                <span class="badge bg-success">Entrada</span>
+                            {% elif mov.tipo == 'salida' %}
+                                <span class="badge bg-danger">Salida</span>
+                            {% elif mov.tipo == 'creacion' %}
+                                <span class="badge bg-primary">Creación</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Ajuste</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center mono-font">{{ mov.cantidad_anterior }}</td>
+                        <td class="text-center mono-font">
+                            <span class="{% if mov.cantidad_cambio > 0 %}cambio-positivo{% elif mov.cantidad_cambio < 0 %}cambio-negativo{% else %}cambio-neutro{% endif %}">
+                                {% if mov.cantidad_cambio > 0 %}+{% endif %}{{ mov.cantidad_cambio }}
+                            </span>
+                        </td>
+                        <td class="text-center mono-font">{{ mov.cantidad_nueva }}</td>
+                        <td style="font-size:0.82rem; color: var(--texto-secundario);">
+                            {{ mov.nota or '—' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="tabla-footer">
+            <span>{{ movimientos.total }} registro(s)</span>
+        </div>
+    </div>
+
+    {# Paginación #}
+    {% if movimientos.pages > 1 %}
+    <nav class="mt-4">
+        <ul class="pagination-custom">
+            <li>
+                {% if movimientos.has_prev %}
+                <a href="{{ url_for('historial', pagina=movimientos.prev_num, tipo=tipo_filtro) }}"
+                   class="btn-pagina"><i class="bi bi-chevron-left"></i> Anterior</a>
+                {% else %}
+                <span class="btn-pagina disabled"><i class="bi bi-chevron-left"></i> Anterior</span>
+                {% endif %}
+            </li>
+            {% for num in movimientos.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if num %}
+                <li>
+                    <a href="{{ url_for('historial', pagina=num, tipo=tipo_filtro) }}"
+                       class="btn-pagina {% if num == movimientos.page %}btn-pagina-activa{% endif %}">
+                        {{ num }}
+                    </a>
+                </li>
+                {% else %}
+                <li><span class="btn-pagina disabled">…</span></li>
+                {% endif %}
+            {% endfor %}
+            <li>
+                {% if movimientos.has_next %}
+                <a href="{{ url_for('historial', pagina=movimientos.next_num, tipo=tipo_filtro) }}"
+                   class="btn-pagina">Siguiente <i class="bi bi-chevron-right"></i></a>
+                {% else %}
+                <span class="btn-pagina disabled">Siguiente <i class="bi bi-chevron-right"></i></span>
+                {% endif %}
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div class="estado-vacio">
+        <i class="bi bi-clock-history fs-1 text-muted"></i>
+        <h4 class="mt-3">Sin movimientos registrados</h4>
+        <p class="text-muted">Los cambios de stock aparecerán aquí automáticamente.</p>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
