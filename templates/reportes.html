@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block titulo %}Reportes{% endblock %}
+
+{% block contenido %}
+
+<div class="page-header">
+    <div class="container-fluid px-4">
+        <h1 class="page-title">Reportes PDF</h1>
+        <p class="page-subtitle">Genera y descarga reportes del inventario en formato PDF</p>
+    </div>
+</div>
+
+<div class="container-fluid px-4 mt-4 mb-5">
+
+    <!-- Tarjetas de resumen rápido -->
+    <div class="row g-4 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="kpi-card kpi-azul">
+                <div class="kpi-icon"><i class="bi bi-box-seam-fill"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-valor">{{ total_productos }}</span>
+                    <span class="kpi-label">Productos</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="kpi-card kpi-morado">
+                <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-valor">${{ "{:,.0f}".format(valor_total) }}</span>
+                    <span class="kpi-label">Valor total</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="kpi-card {% if criticos %}kpi-rojo{% else %}kpi-verde{% endif %}">
+                <div class="kpi-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-valor">{{ criticos | length }}</span>
+                    <span class="kpi-label">Críticos</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="kpi-card {% if bajos %}kpi-amarillo{% else %}kpi-verde{% endif %}">
+                <div class="kpi-icon"><i class="bi bi-arrow-down-circle-fill"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-valor">{{ bajos | length }}</span>
+                    <span class="kpi-label">Stock bajo</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reportes disponibles -->
+    <h5 class="seccion-titulo mb-3">Reportes disponibles</h5>
+    <div class="row g-4">
+
+        <!-- Reporte inventario completo -->
+        <div class="col-12 col-md-6">
+            <div class="reporte-card">
+                <div class="reporte-icono" style="background: #EFF6FF; color: #2563EB;">
+                    <i class="bi bi-file-earmark-text-fill"></i>
+                </div>
+                <div class="reporte-info">
+                    <h6>Inventario completo</h6>
+                    <p>Todos los productos con precios, stock y valor total. Incluye resumen ejecutivo al pie.</p>
+                </div>
+                <div class="reporte-acciones">
+                    <a href="{{ url_for('reporte_inventario') }}" target="_blank" class="btn-reporte">
+                        <i class="bi bi-eye me-1"></i>Ver PDF
+                    </a>
+                    <a href="{{ url_for('reporte_inventario') }}" download class="btn-reporte-secondary">
+                        <i class="bi bi-download me-1"></i>Descargar
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reporte por categoría -->
+        <div class="col-12 col-md-6">
+            <div class="reporte-card">
+                <div class="reporte-icono" style="background: #F5F3FF; color: #7C3AED;">
+                    <i class="bi bi-funnel-fill"></i>
+                </div>
+                <div class="reporte-info">
+                    <h6>Inventario por categoría</h6>
+                    <p>Filtra el reporte a una sola categoría. Útil para revisar secciones específicas.</p>
+                </div>
+                <div class="reporte-acciones">
+                    <form method="GET" action="{{ url_for('reporte_inventario') }}"
+                          target="_blank" class="d-flex gap-2 w-100">
+                        <select name="categoria" class="form-select input-custom" style="font-size:0.82rem;">
+                            {% for cat in categorias %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn-reporte" style="white-space:nowrap;">
+                            <i class="bi bi-eye me-1"></i>Ver
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reporte de alertas -->
+        <div class="col-12 col-md-6">
+            <div class="reporte-card">
+                <div class="reporte-icono" style="background: #FEF2F2; color: #DC2626;">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                </div>
+                <div class="reporte-info">
+                    <h6>Alertas de stock</h6>
+                    <p>
+                        Solo productos con stock crítico (&lt;5) o bajo (&lt;10).
+                        {% if criticos or bajos %}
+                            <strong style="color: #DC2626;">
+                                {{ (criticos | length) + (bajos | length) }} producto(s) requieren atención.
+                            </strong>
+                        {% else %}
+                            <span style="color: #16A34A;">✅ Todo el stock está en nivel normal.</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="reporte-acciones">
+                    <a href="{{ url_for('reporte_alertas') }}" target="_blank" class="btn-reporte btn-reporte-danger">
+                        <i class="bi bi-eye me-1"></i>Ver PDF
+                    </a>
+                    <a href="{{ url_for('reporte_alertas') }}" download class="btn-reporte-secondary">
+                        <i class="bi bi-download me-1"></i>Descargar
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Próximamente -->
+        <div class="col-12 col-md-6">
+            <div class="reporte-card reporte-card-pronto">
+                <div class="reporte-icono" style="background: #F1F5F9; color: #94A3B8;">
+                    <i class="bi bi-clock-history"></i>
+                </div>
+                <div class="reporte-info">
+                    <h6 style="color: var(--texto-muted);">Reporte de historial</h6>
+                    <p>Movimientos de stock por rango de fechas. Entradas, salidas y ajustes.</p>
+                </div>
+                <div class="reporte-acciones">
+                    <span class="badge bg-secondary">Semana 9</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

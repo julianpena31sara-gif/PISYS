@@ -16,7 +16,7 @@
 
 <div class="container-fluid px-4 mt-4 mb-5">
 
-    {# Filtros por tipo #}
+    <!-- Filtros por tipo -->
     <div class="d-flex gap-2 mb-4 flex-wrap">
         <a href="{{ url_for('historial') }}"
            class="btn-filtro-tipo {% if not tipo_filtro %}activo{% endif %}">
@@ -103,7 +103,7 @@
         </div>
     </div>
 
-    {# Paginación #}
+    <!-- Paginación -->
     {% if movimientos.pages > 1 %}
     <nav class="mt-4">
         <ul class="pagination-custom">

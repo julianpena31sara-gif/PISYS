@@ -1,87 +1,38 @@
-# ============================================================
-# app.py — Punto de entrada principal del sistema
-# ============================================================
-# Aquí vive TODO el "cerebro" de la aplicación.
-# Flask es el framework que recibe peticiones del navegador
-# y decide qué responder. SQLAlchemy es el "traductor" que
-# convierte objetos Python en filas de la base de datos.
-# ============================================================
-
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, make_response
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-import os
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+import io
 
-# ------ CONFIGURACIÓN DE LA APP ------
-
-# Flask(__name__) le dice a Flask dónde está el proyecto
-# para que encuentre las carpetas templates/ y static/
 app = Flask(__name__)
-
-# SECRET_KEY se usa para cifrar las sesiones y mensajes flash.
-# En producción real usarías algo más seguro, pero para
-# aprender esto funciona perfecto.
 app.config['SECRET_KEY'] = 'clave-super-secreta-cambiala-en-produccion'
-
-# La base de datos SQLite se guarda en la carpeta instance/
-# que Flask crea automáticamente. No la metas en git.
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventario.db'
-
-# Esto desactiva un aviso molesto de SQLAlchemy
-# que no necesitamos para aprender
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# db es el objeto que usaremos en TODA la app para hablar
-# con la base de datos. Se conecta con la app de Flask.
 db = SQLAlchemy(app)
 
 
-# ------ MODELOS (TABLAS DE LA BASE DE DATOS) ------
-
-# Cada clase que hereda de db.Model se convierte en una tabla.
-# Los atributos db.Column(...) son las columnas de esa tabla.
-
+# MODELOS
 class Producto(db.Model):
-    """
-    Tabla 'producto' en la base de datos.
-    Guarda toda la información de cada producto del inventario.
-    """
-    # Nombre de la tabla en SQLite (opcional, Flask lo genera solo)
     __tablename__ = 'producto'
 
-    # Clave primaria: identificador único, se auto-incrementa (1, 2, 3...)
-    id = db.Column(db.Integer, primary_key=True)
-
-    # Nombre del producto — obligatorio (nullable=False)
-    nombre = db.Column(db.String(100), nullable=False)
-
-    # Descripción opcional — puede estar vacía
-    descripcion = db.Column(db.Text, nullable=True)
-
-    # Precio con decimales (Ej: 15.99)
-    precio = db.Column(db.Float, nullable=False, default=0.0)
-
-    # Cantidad en stock — cuántas unidades hay
-    cantidad = db.Column(db.Integer, nullable=False, default=0)
-
-    # Categoría para agrupar productos (Electronics, Ropa, etc.)
-    categoria = db.Column(db.String(50), nullable=True, default='General')
-
-    # Fecha en que se agregó el producto — se pone automáticamente
+    id             = db.Column(db.Integer, primary_key=True)
+    nombre         = db.Column(db.String(100), nullable=False)
+    descripcion    = db.Column(db.Text, nullable=True)
+    precio         = db.Column(db.Float, nullable=False, default=0.0)
+    cantidad       = db.Column(db.Integer, nullable=False, default=0)
+    categoria      = db.Column(db.String(50), nullable=True, default='General')
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # __repr__ define cómo se ve el objeto en la consola de Python
-    # Es solo para depuración, no afecta la app
     def __repr__(self):
-        return f'<Producto {self.nombre} | Stock: {self.cantidad}>'
+        return f'<Producto {self.nombre}>'
 
     def estado_stock(self):
-        """
-        Devuelve el estado del stock para mostrar colores en la interfaz.
-        - 'critico'  → menos de 5 unidades  (rojo)
-        - 'bajo'     → menos de 10 unidades  (amarillo)
-        - 'normal'   → 10 o más unidades     (verde)
-        """
         if self.cantidad < 5:
             return 'critico'
         elif self.cantidad < 10:
@@ -89,66 +40,21 @@ class Producto(db.Model):
         return 'normal'
 
     def valor_total(self):
-        """
-        Calcula el valor total del stock de este producto.
-        Ej: 50 unidades × $15.99 = $799.50
-        """
         return self.precio * self.cantidad
 
 
-# ============================================================
-# SEMANA 6 — MODELO DE MOVIMIENTOS DE STOCK
-# ============================================================
-
 class Movimiento(db.Model):
-    """
-    Tabla 'movimiento' — registra cada vez que el stock cambia.
-
-    Cada vez que alguien edita la cantidad de un producto,
-    guardamos un registro aquí con:
-    - qué producto cambió
-    - cuánto cambió (positivo = entrada, negativo = salida)
-    - la cantidad antes y después del cambio
-    - cuándo ocurrió
-
-    Esto nos permite ver el historial completo y calcular
-    las alertas predictivas en semana 11.
-    """
     __tablename__ = 'movimiento'
 
-    id = db.Column(db.Integer, primary_key=True)
-
-    # Llave foránea: referencia al producto que cambió
-    # ForeignKey('producto.id') le dice a SQLAlchemy que este número
-    # corresponde al id de la tabla producto
-    producto_id = db.Column(db.Integer, db.ForeignKey('producto.id'), nullable=False)
-
-    # Tipo de movimiento para clasificar
-    # 'entrada'  = llegó más stock (compra, devolución)
-    # 'salida'   = salió stock (venta, pérdida)
-    # 'ajuste'   = corrección manual
-    # 'creacion' = cuando se registra el producto por primera vez
-    tipo = db.Column(db.String(20), nullable=False, default='ajuste')
-
-    # Cuántas unidades cambiaron
-    # Positivo (+10) = entraron 10 unidades
-    # Negativo (-5)  = salieron 5 unidades
-    cantidad_cambio = db.Column(db.Integer, nullable=False)
-
-    # Stock antes y después del cambio (útil para auditoría)
+    id                = db.Column(db.Integer, primary_key=True)
+    producto_id       = db.Column(db.Integer, db.ForeignKey('producto.id'), nullable=False)
+    tipo              = db.Column(db.String(20), nullable=False, default='ajuste')
+    cantidad_cambio   = db.Column(db.Integer, nullable=False)
     cantidad_anterior = db.Column(db.Integer, nullable=False)
     cantidad_nueva    = db.Column(db.Integer, nullable=False)
+    nota              = db.Column(db.String(200), nullable=True)
+    fecha             = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Nota opcional del usuario explicando por qué cambió
-    nota = db.Column(db.String(200), nullable=True)
-
-    # Cuándo ocurrió el movimiento
-    fecha = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # relationship() permite acceder al producto desde el movimiento:
-    # movimiento.producto.nombre  (sin hacer otra consulta a la BD)
-    # backref='movimientos' permite acceder desde el producto:
-    # producto.movimientos  (lista de todos sus movimientos)
     producto = db.relationship('Producto', backref='movimientos')
 
     def __repr__(self):
@@ -156,429 +62,224 @@ class Movimiento(db.Model):
         return f'<Movimiento {self.producto_id} {signo}{self.cantidad_cambio}>'
 
 
-# ------ RUTAS (PÁGINAS DE LA APP) ------
-
-# Una "ruta" es la URL que escribe el usuario en el navegador.
-# @app.route('/') significa "cuando alguien vaya a localhost:5000/"
-# ejecuta la función que está abajo.
-
-@app.route('/')
-def inicio():
-    """
-    Página principal del sistema.
-    Muestra un resumen del inventario: totales, alertas, etc.
-    """
-    # Contamos cuántos productos hay en total
-    total_productos = Producto.query.count()
-
-    # Buscamos productos con stock CRÍTICO (menos de 5 unidades)
-    # .filter() es como el WHERE en SQL
-    # .all() trae todos los resultados como lista
-    alertas_criticas = Producto.query.filter(Producto.cantidad < 5).all()
-
-    # Buscamos productos con stock BAJO (entre 5 y 9 unidades)
-    alertas_bajas = Producto.query.filter(
-        Producto.cantidad >= 5,
-        Producto.cantidad < 10
-    ).all()
-
-    # Calculamos el valor total del inventario completo
-    # Sumamos precio×cantidad de cada producto
-    todos_los_productos = Producto.query.all()
-    valor_total_inventario = sum(p.valor_total() for p in todos_los_productos)
-
-    # render_template() busca el archivo en la carpeta templates/
-    # y le pasa las variables como parámetros nombrados
-    return render_template(
-        'inicio.html',
-        total_productos=total_productos,
-        alertas_criticas=alertas_criticas,
-        alertas_bajas=alertas_bajas,
-        valor_total_inventario=valor_total_inventario
-    )
-
-
-@app.route('/productos')
-def lista_productos():
-    """
-    SEMANA 4 — Lista de productos con:
-      - Búsqueda por nombre (parámetro GET: ?buscar=laptop)
-      - Filtro por categoría (?categoria=Electrónica)
-      - Paginación (10 productos por página, ?pagina=2)
-
-    Los parámetros vienen en la URL. Flask los lee con request.args.
-    Ejemplo de URL completa:
-      /productos?buscar=mouse&categoria=Electrónica&pagina=1
-    """
-
-    # ------ LEER PARÁMETROS DE LA URL ------
-
-    # request.args.get('clave', 'valor_por_defecto')
-    # Si el parámetro no está en la URL, devuelve el valor por defecto
-    buscar    = request.args.get('buscar', '').strip()
-    categoria = request.args.get('categoria', '')
-    pagina    = request.args.get('pagina', 1, type=int)  # type=int convierte automáticamente
-
-    # Cuántos productos mostramos por página
-    POR_PAGINA = 10
-
-    # ------ CONSTRUIR LA CONSULTA DINÁMICAMENTE ------
-
-    # Empezamos con una consulta base — todavía no va a la BD
-    # Es como armar la frase SQL paso a paso
-    consulta = Producto.query
-
-    # Si el usuario escribió algo en el buscador, filtramos por nombre
-    # ilike() es como LIKE en SQL pero sin importar mayúsculas/minúsculas
-    # El % antes y después significa "cualquier texto alrededor"
-    if buscar:
-        consulta = consulta.filter(
-            Producto.nombre.ilike(f'%{buscar}%')
-        )
-
-    # Si el usuario eligió una categoría, filtramos por ella
-    if categoria:
-        consulta = consulta.filter(Producto.categoria == categoria)
-
-    # Ordenamos: primero los más recientes
-    consulta = consulta.order_by(Producto.fecha_creacion.desc())
-
-    # ------ PAGINACIÓN ------
-
-    # .paginate() divide los resultados en páginas automáticamente.
-    # Devuelve un objeto especial con los productos de la página actual
-    # y metadata útil: total de páginas, si hay página siguiente, etc.
-    productos_paginados = consulta.paginate(
-        page=pagina,
-        per_page=POR_PAGINA,
-        error_out=False   # Si la página no existe, devuelve lista vacía (no error 404)
-    )
-
-    # ------ CATEGORÍAS PARA EL FILTRO ------
-
-    # Obtenemos todas las categorías únicas para mostrar en el select
-    # .distinct() es como SELECT DISTINCT en SQL — sin repetidos
-    categorias = db.session.query(Producto.categoria)\
-                           .distinct()\
-                           .order_by(Producto.categoria)\
-                           .all()
-    # El resultado es una lista de tuplas [('Electrónica',), ('Papelería',)]
-    # La convertimos a lista plana ['Electrónica', 'Papelería']
-    categorias = [c[0] for c in categorias if c[0]]
-
-    return render_template(
-        'productos.html',
-        productos=productos_paginados,   # objeto paginado (no lista simple)
-        categorias=categorias,
-        buscar=buscar,                   # para que el input muestre lo que buscó
-        categoria_activa=categoria       # para resaltar el filtro activo
-    )
-
-
-@app.route('/productos/<int:id>')
-def detalle_producto(id):
-    """
-    SEMANA 4 — Página de detalle de un producto individual.
-    """
-    producto = Producto.query.get_or_404(id)
-    return render_template('detalle.html', producto=producto)
-
-
-# ============================================================
-# SEMANA 5 — CREAR Y EDITAR PRODUCTOS
-# ============================================================
-
-# Lista de categorías fijas para el formulario.
-# En un sistema más avanzado esto vendría de una tabla separada.
-CATEGORIAS = ['Electrónica', 'Papelería', 'Mobiliario', 'Limpieza',
-              'Alimentos', 'Ropa', 'Herramientas', 'General']
-
-
-@app.route('/productos/nuevo', methods=['GET', 'POST'])
-def nuevo_producto():
-    """
-    SEMANA 5 — Formulario para crear un producto nuevo.
-
-    Esta ruta maneja DOS tipos de petición:
-    - GET:  El usuario abre el formulario vacío (solo visitar la página)
-    - POST: El usuario envió el formulario con datos (hacer clic en Guardar)
-
-    methods=['GET', 'POST'] le dice a Flask que acepte ambos tipos.
-    Dentro usamos request.method para saber cuál llegó.
-    """
-
-    if request.method == 'POST':
-        # ------ EL USUARIO ENVIÓ EL FORMULARIO ------
-
-        # request.form es un diccionario con todos los campos del formulario.
-        # .get('nombre') lee el campo con name="nombre" del HTML.
-        # .strip() elimina espacios en blanco al inicio y al final.
-        nombre      = request.form.get('nombre', '').strip()
-        descripcion = request.form.get('descripcion', '').strip()
-        categoria   = request.form.get('categoria', 'General').strip()
-
-        # Para precio y cantidad necesitamos convertir el texto a número.
-        # Usamos try/except porque si el usuario escribe "abc" en precio,
-        # float("abc") lanzaría un error y rompería la app.
-        try:
-            precio   = float(request.form.get('precio', 0))
-            cantidad = int(request.form.get('cantidad', 0))
-        except ValueError:
-            # Si la conversión falla, mostramos error y volvemos al formulario
-            flash('❌ El precio y la cantidad deben ser números válidos.', 'danger')
-            return render_template('formulario.html',
-                                   titulo='Nuevo Producto',
-                                   categorias=CATEGORIAS,
-                                   producto=None)
-
-        # ------ VALIDACIONES ------
-        # Verificamos que los datos tengan sentido antes de guardar.
-        # Nunca confíes en que el usuario llenó bien el formulario.
-
-        errores = []
-
-        if not nombre:
-            errores.append('El nombre del producto es obligatorio.')
-
-        if len(nombre) > 100:
-            errores.append('El nombre no puede tener más de 100 caracteres.')
-
-        if precio < 0:
-            errores.append('El precio no puede ser negativo.')
-
-        if cantidad < 0:
-            errores.append('La cantidad no puede ser negativa.')
-
-        # Si hay errores, los mostramos y devolvemos el formulario
-        # con los datos que ya había escrito el usuario (para no perderlos)
-        if errores:
-            for error in errores:
-                flash(f'❌ {error}', 'danger')
-            # Pasamos los datos del form para pre-llenar el formulario
-            datos_form = {
-                'nombre': nombre,
-                'descripcion': descripcion,
-                'precio': precio,
-                'cantidad': cantidad,
-                'categoria': categoria
-            }
-            return render_template('formulario.html',
-                                   titulo='Nuevo Producto',
-                                   categorias=CATEGORIAS,
-                                   producto=datos_form)
-
-        # ------ GUARDAR EN LA BASE DE DATOS ------
-        # Si llegamos aquí, todos los datos son válidos.
-
-        nuevo = Producto(
-            nombre=nombre,
-            descripcion=descripcion,
-            precio=precio,
-            cantidad=cantidad,
-            categoria=categoria
-            # fecha_creacion se pone automáticamente (default=datetime.utcnow)
-        )
-
-        # db.session es como una "caja de cambios pendientes".
-        # .add() agrega el objeto a la lista de cambios.
-        # .commit() ejecuta TODOS los cambios de una vez en la BD.
-        # Si algo falla antes del commit, nada se guarda (es seguro).
-        db.session.add(nuevo)
-        db.session.flush()  # flush() asigna el ID sin hacer commit todavía
-
-        # Registramos el movimiento inicial de creación
-        if nuevo.cantidad > 0:
-            registrar_movimiento(
-                nuevo,
-                cantidad_anterior=0,
-                tipo='creacion',
-                nota='Stock inicial al registrar el producto'
-            )
-
-        db.session.commit()
-
-        # flash() guarda un mensaje que se muestra en la SIGUIENTE página.
-        # 'success' define el color verde del mensaje.
-        flash(f'✅ Producto "{nombre}" creado exitosamente.', 'success')
-
-        # redirect() lleva al usuario a otra página.
-        # url_for('lista_productos') genera la URL /productos
-        return redirect(url_for('lista_productos'))
-
-    # ------ EL USUARIO SOLO ABRIÓ EL FORMULARIO (GET) ------
-    # Mostramos el formulario vacío
-    return render_template('formulario.html',
-                           titulo='Nuevo Producto',
-                           categorias=CATEGORIAS,
-                           producto=None)
-
-
-@app.route('/productos/editar/<int:id>', methods=['GET', 'POST'])
-def editar_producto(id):
-    """
-    SEMANA 5 — Formulario para editar un producto existente.
-
-    Es casi igual a nuevo_producto(), con dos diferencias:
-    1. En GET, pre-llenamos el formulario con los datos actuales.
-    2. En POST, actualizamos el producto existente en vez de crear uno nuevo.
-    """
-
-    # Buscamos el producto. Si no existe → error 404 automático.
-    producto = Producto.query.get_or_404(id)
-
-    if request.method == 'POST':
-        # ------ LEER Y VALIDAR (igual que en nuevo_producto) ------
-
-        nombre      = request.form.get('nombre', '').strip()
-        descripcion = request.form.get('descripcion', '').strip()
-        categoria   = request.form.get('categoria', 'General').strip()
-
-        try:
-            precio   = float(request.form.get('precio', 0))
-            cantidad = int(request.form.get('cantidad', 0))
-        except ValueError:
-            flash('❌ El precio y la cantidad deben ser números válidos.', 'danger')
-            return render_template('formulario.html',
-                                   titulo=f'Editar: {producto.nombre}',
-                                   categorias=CATEGORIAS,
-                                   producto=producto)
-
-        errores = []
-        if not nombre:
-            errores.append('El nombre del producto es obligatorio.')
-        if len(nombre) > 100:
-            errores.append('El nombre no puede tener más de 100 caracteres.')
-        if precio < 0:
-            errores.append('El precio no puede ser negativo.')
-        if cantidad < 0:
-            errores.append('La cantidad no puede ser negativa.')
-
-        if errores:
-            for error in errores:
-                flash(f'❌ {error}', 'danger')
-            return render_template('formulario.html',
-                                   titulo=f'Editar: {producto.nombre}',
-                                   categorias=CATEGORIAS,
-                                   producto=producto)
-
-        # ------ ACTUALIZAR EL PRODUCTO EXISTENTE ------
-        # Guardamos la cantidad anterior ANTES de modificar
-        cantidad_anterior = producto.cantidad
-
-        producto.nombre      = nombre
-        producto.descripcion = descripcion
-        producto.precio      = precio
-        producto.cantidad    = cantidad
-        producto.categoria   = categoria
-
-        # Si la cantidad cambió, registramos el movimiento
-        if cantidad != cantidad_anterior:
-            registrar_movimiento(
-                producto,
-                cantidad_anterior,
-                tipo='ajuste',
-                nota='Modificación desde formulario de edición'
-            )
-
-        db.session.commit()
-
-        flash(f'✅ Producto "{nombre}" actualizado correctamente.', 'success')
-        return redirect(url_for('detalle_producto', id=producto.id))
-
-    # ------ GET: mostrar formulario pre-llenado con datos actuales ------
-    return render_template('formulario.html',
-                           titulo=f'Editar: {producto.nombre}',
-                           categorias=CATEGORIAS,
-                           producto=producto)
-
-
-# ============================================================
-# SEMANA 6 — FUNCIÓN HELPER PARA REGISTRAR MOVIMIENTOS
-# ============================================================
-
+# HELPERS
 def registrar_movimiento(producto, cantidad_anterior, tipo='ajuste', nota=None):
-    """
-    Función auxiliar que crea un registro en la tabla Movimiento.
-
-    La llamamos cada vez que el stock de un producto cambia:
-    - Al editar un producto (semana 5, ahora con registro)
-    - Al crear un producto nuevo
-    - Al eliminar (registramos antes de borrar)
-
-    Parámetros:
-        producto:          el objeto Producto que cambió
-        cantidad_anterior: cuánto tenía ANTES del cambio
-        tipo:              'creacion', 'ajuste', 'entrada', 'salida'
-        nota:              texto explicativo opcional
-    """
+    """Registra un movimiento de stock. No hace commit."""
     cambio = producto.cantidad - cantidad_anterior
-
-    # Solo registramos si hubo un cambio real en la cantidad
-    # (no registramos si solo cambió el nombre o el precio)
-    if cambio == 0 and tipo not in ('creacion',):
+    if cambio == 0 and tipo != 'creacion':
         return
-
-    movimiento = Movimiento(
+    db.session.add(Movimiento(
         producto_id       = producto.id,
         tipo              = tipo,
         cantidad_cambio   = cambio,
         cantidad_anterior = cantidad_anterior,
         cantidad_nueva    = producto.cantidad,
         nota              = nota
-    )
-    db.session.add(movimiento)
-    # Nota: NO hacemos commit aquí — lo hace la función que nos llama.
-    # Así ambos cambios (producto + movimiento) se guardan juntos.
+    ))
 
 
-# ============================================================
-# SEMANA 6 — ELIMINAR PRODUCTO
-# ============================================================
+def _estilos_pdf():
+    """Estilos ReportLab reutilizables."""
+    base = getSampleStyleSheet()
+    return {
+        'titulo': ParagraphStyle('titulo', parent=base['Title'],
+                                 fontSize=20, textColor=colors.HexColor('#1E3A5F'), spaceAfter=4),
+        'subtitulo': ParagraphStyle('subtitulo', parent=base['Normal'],
+                                    fontSize=10, textColor=colors.HexColor('#64748B'), spaceAfter=2),
+        'seccion': ParagraphStyle('seccion', parent=base['Normal'],
+                                  fontSize=12, fontName='Helvetica-Bold',
+                                  textColor=colors.HexColor('#1E3A5F'), spaceBefore=14, spaceAfter=6),
+        'normal': ParagraphStyle('normal', parent=base['Normal'],
+                                 fontSize=9, textColor=colors.HexColor('#374151')),
+        'pie': ParagraphStyle('pie', parent=base['Normal'],
+                              fontSize=8, textColor=colors.HexColor('#9CA3AF'), alignment=TA_CENTER),
+    }
+
+
+def _encabezado_pdf(elementos, estilos, titulo_reporte, subtitulo_reporte):
+    """Encabezado estándar para PDFs."""
+    elementos.append(Paragraph('PISYS', estilos['titulo']))
+    elementos.append(Paragraph(titulo_reporte, estilos['seccion']))
+    elementos.append(Paragraph(
+        f'{subtitulo_reporte} &nbsp;·&nbsp; Generado: {datetime.now().strftime("%d/%m/%Y %H:%M")}',
+        estilos['subtitulo']
+    ))
+    elementos.append(HRFlowable(width='100%', thickness=1,
+                                color=colors.HexColor('#2563EB'), spaceAfter=12))
+
+
+def _estilo_tabla_base():
+    """TableStyle base para tablas PDF."""
+    return TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, 0),  colors.HexColor('#1E3A5F')),
+        ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
+        ('FONTNAME',      (0, 0), (-1, 0),  'Helvetica-Bold'),
+        ('FONTSIZE',      (0, 0), (-1, 0),  9),
+        ('FONTNAME',      (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE',      (0, 1), (-1, -1), 8),
+        ('ROWBACKGROUND', (0, 2), (-1, -1), colors.HexColor('#F8FAFC')),
+        ('GRID',          (0, 0), (-1, -1), 0.4, colors.HexColor('#E2E8F0')),
+        ('PADDING',       (0, 0), (-1, -1), 6),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+    ])
+
+
+def _enviar_pdf(buffer, filename):
+    """Convierte buffer en respuesta Flask con cabeceras PDF."""
+    buffer.seek(0)
+    response = make_response(buffer.read())
+    response.headers['Content-Type']        = 'application/pdf'
+    response.headers['Content-Disposition'] = f'inline; filename={filename}'
+    return response
+
+
+CATEGORIAS = ['Electrónica', 'Papelería', 'Mobiliario', 'Limpieza',
+              'Alimentos', 'Ropa', 'Herramientas', 'General']
+
+
+# RUTAS PRINCIPALES
+@app.route('/')
+def inicio():
+    total_productos        = Producto.query.count()
+    alertas_criticas       = Producto.query.filter(Producto.cantidad < 5).all()
+    alertas_bajas          = Producto.query.filter(Producto.cantidad >= 5, Producto.cantidad < 10).all()
+    valor_total_inventario = sum(p.valor_total() for p in Producto.query.all())
+
+    return render_template('inicio.html',
+                           total_productos=total_productos,
+                           alertas_criticas=alertas_criticas,
+                           alertas_bajas=alertas_bajas,
+                           valor_total_inventario=valor_total_inventario)
+
+
+@app.route('/productos')
+def lista_productos():
+    buscar    = request.args.get('buscar', '').strip()
+    categoria = request.args.get('categoria', '')
+    pagina    = request.args.get('pagina', 1, type=int)
+
+    consulta = Producto.query
+    if buscar:
+        consulta = consulta.filter(Producto.nombre.ilike(f'%{buscar}%'))
+    if categoria:
+        consulta = consulta.filter(Producto.categoria == categoria)
+
+    productos  = consulta.order_by(Producto.fecha_creacion.desc()) \
+                         .paginate(page=pagina, per_page=10, error_out=False)
+    categorias = [c[0] for c in db.session.query(Producto.categoria)
+                                          .distinct().order_by(Producto.categoria).all() if c[0]]
+
+    return render_template('productos.html', productos=productos,
+                           categorias=categorias, buscar=buscar, categoria_activa=categoria)
+
+
+@app.route('/productos/<int:id>')
+def detalle_producto(id):
+    return render_template('detalle.html', producto=Producto.query.get_or_404(id))
+
+
+# CRUD
+@app.route('/productos/nuevo', methods=['GET', 'POST'])
+def nuevo_producto():
+    if request.method == 'POST':
+        nombre      = request.form.get('nombre', '').strip()
+        descripcion = request.form.get('descripcion', '').strip()
+        categoria   = request.form.get('categoria', 'General').strip()
+
+        try:
+            precio   = float(request.form.get('precio', 0))
+            cantidad = int(request.form.get('cantidad', 0))
+        except ValueError:
+            flash('❌ Precio y cantidad deben ser números válidos.', 'danger')
+            return render_template('formulario.html', titulo='Nuevo Producto',
+                                   categorias=CATEGORIAS, producto=None)
+
+        errores = []
+        if not nombre:           errores.append('El nombre es obligatorio.')
+        if precio < 0:           errores.append('El precio no puede ser negativo.')
+        if cantidad < 0:         errores.append('La cantidad no puede ser negativa.')
+
+        if errores:
+            for e in errores: flash(f'❌ {e}', 'danger')
+            return render_template('formulario.html', titulo='Nuevo Producto',
+                                   categorias=CATEGORIAS,
+                                   producto=dict(nombre=nombre, descripcion=descripcion,
+                                                 precio=precio, cantidad=cantidad, categoria=categoria))
+
+        nuevo = Producto(nombre=nombre, descripcion=descripcion,
+                         precio=precio, cantidad=cantidad, categoria=categoria)
+        db.session.add(nuevo)
+        db.session.flush()
+        if nuevo.cantidad > 0:
+            registrar_movimiento(nuevo, 0, tipo='creacion', nota='Stock inicial')
+        db.session.commit()
+
+        flash(f'✅ Producto "{nombre}" creado.', 'success')
+        return redirect(url_for('lista_productos'))
+
+    return render_template('formulario.html', titulo='Nuevo Producto',
+                           categorias=CATEGORIAS, producto=None)
+
+
+@app.route('/productos/editar/<int:id>', methods=['GET', 'POST'])
+def editar_producto(id):
+    producto = Producto.query.get_or_404(id)
+
+    if request.method == 'POST':
+        nombre      = request.form.get('nombre', '').strip()
+        descripcion = request.form.get('descripcion', '').strip()
+        categoria   = request.form.get('categoria', 'General').strip()
+
+        try:
+            precio   = float(request.form.get('precio', 0))
+            cantidad = int(request.form.get('cantidad', 0))
+        except ValueError:
+            flash('❌ Precio y cantidad deben ser números válidos.', 'danger')
+            return render_template('formulario.html', titulo=f'Editar: {producto.nombre}',
+                                   categorias=CATEGORIAS, producto=producto)
+
+        errores = []
+        if not nombre:   errores.append('El nombre es obligatorio.')
+        if precio < 0:   errores.append('El precio no puede ser negativo.')
+        if cantidad < 0: errores.append('La cantidad no puede ser negativa.')
+
+        if errores:
+            for e in errores: flash(f'❌ {e}', 'danger')
+            return render_template('formulario.html', titulo=f'Editar: {producto.nombre}',
+                                   categorias=CATEGORIAS, producto=producto)
+
+        cantidad_anterior    = producto.cantidad
+        producto.nombre      = nombre
+        producto.descripcion = descripcion
+        producto.precio      = precio
+        producto.cantidad    = cantidad
+        producto.categoria   = categoria
+
+        if cantidad != cantidad_anterior:
+            registrar_movimiento(producto, cantidad_anterior, tipo='ajuste',
+                                 nota='Modificación desde formulario')
+        db.session.commit()
+
+        flash(f'✅ Producto "{nombre}" actualizado.', 'success')
+        return redirect(url_for('detalle_producto', id=producto.id))
+
+    return render_template('formulario.html', titulo=f'Editar: {producto.nombre}',
+                           categorias=CATEGORIAS, producto=producto)
+
 
 @app.route('/productos/eliminar/<int:id>', methods=['POST'])
 def eliminar_producto(id):
-    """
-    SEMANA 6 — Elimina un producto de la base de datos.
-
-    IMPORTANTE: Solo aceptamos POST, nunca GET.
-    Si aceptáramos GET, alguien podría enviarte un link como:
-        <img src="/productos/eliminar/5">
-    y al cargar la imagen, ¡borraría el producto 5 sin querer!
-    Con POST solo se puede hacer desde un formulario o JS intencional.
-
-    La confirmación real sucede en el navegador (JavaScript),
-    pero aquí en el servidor también verificamos que el producto exista.
-    """
     producto = Producto.query.get_or_404(id)
-    nombre   = producto.nombre  # Guardamos el nombre antes de borrar
-
-    # Antes de eliminar, borramos sus movimientos también
-    # (porque tienen una llave foránea que apunta a este producto)
+    nombre   = producto.nombre
     Movimiento.query.filter_by(producto_id=id).delete()
-
     db.session.delete(producto)
     db.session.commit()
-
-    flash(f'🗑️ Producto "{nombre}" eliminado correctamente.', 'warning')
+    flash(f'🗑️ Producto "{nombre}" eliminado.', 'warning')
     return redirect(url_for('lista_productos'))
 
 
-# ============================================================
-# SEMANA 6 — AJUSTE RÁPIDO DE STOCK
-# ============================================================
-
 @app.route('/productos/ajustar-stock/<int:id>', methods=['POST'])
 def ajustar_stock(id):
-    """
-    SEMANA 6 — Ajusta el stock de un producto sin ir al formulario completo.
-
-    Recibe dos campos del formulario:
-    - 'operacion': 'sumar' o 'restar'
-    - 'cantidad_ajuste': cuántas unidades sumar o restar
-
-    Esto es más rápido que abrir el formulario de edición completo
-    solo para cambiar 5 unidades de stock.
-    """
     producto = Producto.query.get_or_404(id)
 
     try:
@@ -588,94 +289,182 @@ def ajustar_stock(id):
         return redirect(url_for('detalle_producto', id=id))
 
     if cantidad_ajuste <= 0:
-        flash('❌ La cantidad del ajuste debe ser mayor a 0.', 'danger')
+        flash('❌ La cantidad debe ser mayor a 0.', 'danger')
         return redirect(url_for('detalle_producto', id=id))
 
-    operacion        = request.form.get('operacion', 'sumar')
+    operacion         = request.form.get('operacion', 'sumar')
     cantidad_anterior = producto.cantidad
 
     if operacion == 'sumar':
         producto.cantidad += cantidad_ajuste
-        tipo = 'entrada'
-        nota = f'Entrada de {cantidad_ajuste} unidades (ajuste rápido)'
+        tipo, nota = 'entrada', f'Entrada de {cantidad_ajuste} unidades'
     else:
-        # Verificamos que no quede en negativo
         if producto.cantidad - cantidad_ajuste < 0:
-            flash(f'❌ No puedes restar {cantidad_ajuste} unidades. Solo hay {producto.cantidad} en stock.', 'danger')
+            flash(f'❌ Stock insuficiente. Solo hay {producto.cantidad} unidades.', 'danger')
             return redirect(url_for('detalle_producto', id=id))
         producto.cantidad -= cantidad_ajuste
-        tipo = 'salida'
-        nota = f'Salida de {cantidad_ajuste} unidades (ajuste rápido)'
+        tipo, nota = 'salida', f'Salida de {cantidad_ajuste} unidades'
 
-    # Registramos el movimiento ANTES del commit
     registrar_movimiento(producto, cantidad_anterior, tipo=tipo, nota=nota)
     db.session.commit()
-
-    flash(f'✅ Stock actualizado: {cantidad_anterior} → {producto.cantidad} unidades.', 'success')
+    flash(f'✅ Stock: {cantidad_anterior} → {producto.cantidad} unidades.', 'success')
     return redirect(url_for('detalle_producto', id=id))
 
 
-# ============================================================
-# SEMANA 6 — HISTORIAL DE MOVIMIENTOS
-# ============================================================
-
+# HISTORIAL
 @app.route('/historial')
 def historial():
-    """
-    SEMANA 6 — Muestra el historial completo de movimientos de stock.
-
-    Útil para auditoría: ver qué cambió, cuándo y cuánto.
-    En semana 9 generaremos un PDF con este historial.
-    """
-    pagina    = request.args.get('pagina', 1, type=int)
+    pagina      = request.args.get('pagina', 1, type=int)
     tipo_filtro = request.args.get('tipo', '')
 
     consulta = Movimiento.query
-
     if tipo_filtro:
         consulta = consulta.filter(Movimiento.tipo == tipo_filtro)
 
-    # Ordenamos del más reciente al más antiguo
-    movimientos = consulta.order_by(Movimiento.fecha.desc())\
+    movimientos = consulta.order_by(Movimiento.fecha.desc()) \
                           .paginate(page=pagina, per_page=20, error_out=False)
 
-    return render_template('historial.html',
-                           movimientos=movimientos,
-                           tipo_filtro=tipo_filtro)
+    return render_template('historial.html', movimientos=movimientos, tipo_filtro=tipo_filtro)
 
 
+# REPORTES PDF
+@app.route('/reportes')
+def reportes():
+    productos = Producto.query.all()
+    return render_template('reportes.html',
+                           total_productos=len(productos),
+                           valor_total=sum(p.valor_total() for p in productos),
+                           criticos=[p for p in productos if p.estado_stock() == 'critico'],
+                           bajos=[p for p in productos if p.estado_stock() == 'bajo'],
+                           categorias=[c[0] for c in db.session.query(Producto.categoria)
+                                                               .distinct().order_by(Producto.categoria)
+                                                               .all() if c[0]])
+
+
+@app.route('/reportes/inventario')
+def reporte_inventario():
+    """PDF con inventario completo. Acepta ?categoria= para filtrar."""
+    categoria_filtro = request.args.get('categoria', '')
+    consulta = Producto.query
+    if categoria_filtro:
+        consulta = consulta.filter(Producto.categoria == categoria_filtro)
+    productos = consulta.order_by(Producto.categoria, Producto.nombre).all()
+
+    buffer    = io.BytesIO()
+    doc       = SimpleDocTemplate(buffer, pagesize=letter,
+                                  leftMargin=2*cm, rightMargin=2*cm,
+                                  topMargin=2*cm, bottomMargin=2*cm)
+    estilos   = _estilos_pdf()
+    elementos = []
+
+    subtitulo = f'Categoría: {categoria_filtro}' if categoria_filtro else 'Todos los productos'
+    _encabezado_pdf(elementos, estilos, 'Reporte de Inventario', subtitulo)
+
+    # Tabla de productos
+    filas = [['#', 'Producto', 'Categoría', 'Precio', 'Stock', 'Valor total', 'Estado']]
+    for p in productos:
+        estado = {'critico': 'CRÍTICO', 'bajo': 'BAJO', 'normal': 'Normal'}[p.estado_stock()]
+        filas.append([str(p.id), Paragraph(p.nombre, estilos['normal']),
+                      p.categoria or '—', f'${p.precio:,.0f}',
+                      str(p.cantidad), f'${p.valor_total():,.0f}', estado])
+
+    tabla = Table(filas, colWidths=[1*cm, 5.5*cm, 3*cm, 2.5*cm, 1.5*cm, 2.5*cm, 2*cm], repeatRows=1)
+    estilo = _estilo_tabla_base()
+    for i, p in enumerate(productos, start=1):
+        if p.estado_stock() == 'critico':
+            estilo.add('BACKGROUND', (0, i), (-1, i), colors.HexColor('#FEF2F2'))
+            estilo.add('TEXTCOLOR',  (6, i), (6, i),  colors.HexColor('#DC2626'))
+            estilo.add('FONTNAME',   (6, i), (6, i),  'Helvetica-Bold')
+        elif p.estado_stock() == 'bajo':
+            estilo.add('BACKGROUND', (0, i), (-1, i), colors.HexColor('#FFFBEB'))
+            estilo.add('TEXTCOLOR',  (6, i), (6, i),  colors.HexColor('#D97706'))
+            estilo.add('FONTNAME',   (6, i), (6, i),  'Helvetica-Bold')
+    tabla.setStyle(estilo)
+    elementos.append(tabla)
+
+    # Tabla resumen al pie
+    elementos.append(Spacer(1, 0.5*cm))
+    elementos.append(HRFlowable(width='100%', thickness=0.5,
+                                color=colors.HexColor('#E2E8F0'), spaceAfter=8))
+    valor_total   = sum(p.valor_total() for p in productos)
+    resumen_data  = [
+        ['Total productos', 'Valor inventario', 'Críticos', 'Stock bajo'],
+        [str(len(productos)), f'${valor_total:,.0f}',
+         str(len([p for p in productos if p.estado_stock() == 'critico'])),
+         str(len([p for p in productos if p.estado_stock() == 'bajo']))],
+    ]
+    t_resumen = Table(resumen_data, colWidths=[4.5*cm]*4)
+    t_resumen.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F1F5F9')),
+        ('FONTNAME',   (0, 0), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+        ('TEXTCOLOR',  (0, 1), (-1, 1), colors.HexColor('#1E3A5F')),
+        ('ALIGN',      (0, 0), (-1, -1), 'CENTER'),
+        ('GRID',       (0, 0), (-1, -1), 0.4, colors.HexColor('#E2E8F0')),
+        ('PADDING',    (0, 0), (-1, -1), 8),
+    ]))
+    elementos.append(t_resumen)
+    elementos.append(Spacer(1, 0.3*cm))
+    elementos.append(Paragraph('PISYS — Reporte generado automáticamente', estilos['pie']))
+
+    doc.build(elementos)
+    return _enviar_pdf(buffer, 'inventario.pdf')
+
+
+@app.route('/reportes/alertas')
+def reporte_alertas():
+    """PDF solo con productos en estado crítico o bajo."""
+    productos_alerta = Producto.query.filter(Producto.cantidad < 10) \
+                                     .order_by(Producto.cantidad).all()
+
+    buffer    = io.BytesIO()
+    doc       = SimpleDocTemplate(buffer, pagesize=letter,
+                                  leftMargin=2*cm, rightMargin=2*cm,
+                                  topMargin=2*cm, bottomMargin=2*cm)
+    estilos   = _estilos_pdf()
+    elementos = []
+
+    _encabezado_pdf(elementos, estilos, 'Reporte de Alertas de Stock',
+                    f'{len(productos_alerta)} producto(s) requieren atención')
+
+    if not productos_alerta:
+        elementos.append(Paragraph('✅ No hay productos con stock bajo o crítico.', estilos['normal']))
+    else:
+        filas = [['#', 'Producto', 'Categoría', 'Stock', 'Estado', 'Valor en riesgo']]
+        for p in productos_alerta:
+            estado = 'CRÍTICO' if p.estado_stock() == 'critico' else 'BAJO'
+            filas.append([str(p.id), Paragraph(p.nombre, estilos['normal']),
+                          p.categoria or '—', str(p.cantidad), estado, f'${p.valor_total():,.0f}'])
+
+        tabla = Table(filas, colWidths=[1*cm, 6*cm, 3*cm, 2*cm, 2.5*cm, 3*cm], repeatRows=1)
+        estilo = _estilo_tabla_base()
+        for i, p in enumerate(productos_alerta, start=1):
+            c_fondo = colors.HexColor('#FEF2F2') if p.estado_stock() == 'critico' \
+                      else colors.HexColor('#FFFBEB')
+            c_texto = colors.HexColor('#DC2626') if p.estado_stock() == 'critico' \
+                      else colors.HexColor('#D97706')
+            estilo.add('BACKGROUND', (0, i), (-1, i), c_fondo)
+            estilo.add('TEXTCOLOR',  (4, i), (4, i),  c_texto)
+            estilo.add('FONTNAME',   (4, i), (4, i),  'Helvetica-Bold')
+        tabla.setStyle(estilo)
+        elementos.append(tabla)
+
+    elementos.append(Spacer(1, 0.5*cm))
+    elementos.append(Paragraph('PISYS — Reporte de alertas', estilos['pie']))
+    doc.build(elementos)
+    return _enviar_pdf(buffer, 'alertas.pdf')
+
+
+# DASHBOARD
 @app.route('/dashboard')
 def dashboard():
-    """
-    Página del dashboard con gráficos.
-    En semana 10 agregaremos Plotly aquí.
-    """
     return render_template('dashboard.html')
 
 
-@app.route('/reportes')
-def reportes():
-    """
-    Página de generación de reportes PDF.
-    En semana 7 conectaremos ReportLab aquí.
-    """
-    return render_template('reportes.html')
-
-
-# ------ ARRANQUE DE LA APP ------
-
-# Este bloque solo corre si ejecutas: python app.py
-# NO corre si otro archivo importa app.py
+# ARRANQUE
 if __name__ == '__main__':
-    # Creamos las tablas en la base de datos si no existen todavía.
-    # app_context() es necesario para que SQLAlchemy sepa a qué
-    # app pertenece la operación.
     with app.app_context():
         db.create_all()
-        print("✅ Base de datos lista")
-        print("🚀 Servidor corriendo en: http://localhost:5000")
-        print("   Presiona Ctrl+C para detenerlo")
-
-    # debug=True recarga la app automáticamente cuando cambias el código
-    # NUNCA uses debug=True en producción real
+        print('✅ Base de datos lista')
+        print('🚀 http://localhost:5000')
     app.run(debug=True)

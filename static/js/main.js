@@ -1,5 +1,5 @@
 // ============================================================
-// main.js — JavaScript del sistema InvenSys
+// main.js — JavaScript del sistema PISYS
 // ============================================================
 // Por ahora este archivo es pequeño. En semanas posteriores
 // agregaremos más interactividad aquí:
@@ -10,7 +10,7 @@
 // Esperamos a que el HTML esté listo antes de ejecutar el código
 document.addEventListener('DOMContentLoaded', function() {
 
-    console.log('✅ InvenSys cargado correctamente');
+    console.log('✅ PISYS cargado correctamente');
 
     // ------ AUTO-CERRAR ALERTAS FLASH ------
     // Los mensajes de éxito/error de Flask se cierran solos

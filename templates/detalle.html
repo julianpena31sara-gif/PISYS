@@ -3,20 +3,12 @@
 
 {% block contenido %}
 
-{# ===== HEADER CON BREADCRUMB ===== #}
-{#
-    Un breadcrumb es la navegación tipo "migajas de pan":
-    Inicio > Productos > Nombre del producto
-    Le dice al usuario dónde está dentro del sistema.
-#}
+<!-- Header con breadcrumb -->
 <div class="page-header">
     <div class="container-fluid px-4">
 
-        {# Breadcrumb #}
         <nav class="breadcrumb-custom mb-2">
-            <a href="{{ url_for('inicio') }}">
-                <i class="bi bi-house-door me-1"></i>Inicio
-            </a>
+            <a href="{{ url_for('inicio') }}"><i class="bi bi-house-door me-1"></i>Inicio</a>
             <span class="breadcrumb-sep">/</span>
             <a href="{{ url_for('lista_productos') }}">Productos</a>
             <span class="breadcrumb-sep">/</span>
@@ -46,23 +38,20 @@
 <div class="container-fluid px-4 mt-4 mb-5">
     <div class="row g-4">
 
-        {# ===== COLUMNA IZQUIERDA: INFO PRINCIPAL ===== #}
+        <!-- Columna izquierda: información principal -->
         <div class="col-12 col-lg-8">
 
-            {# Tarjeta de información general #}
+            <!-- Información general -->
             <div class="detalle-card mb-4">
                 <div class="detalle-card-header">
                     <i class="bi bi-info-circle me-2"></i>Información general
                 </div>
                 <div class="detalle-card-body">
-
                     <div class="detalle-grid">
-
                         <div class="detalle-campo">
                             <span class="campo-label">Nombre del producto</span>
                             <span class="campo-valor">{{ producto.nombre }}</span>
                         </div>
-
                         <div class="detalle-campo">
                             <span class="campo-label">Categoría</span>
                             <span class="campo-valor">
@@ -72,43 +61,33 @@
                                 </a>
                             </span>
                         </div>
-
                         <div class="detalle-campo detalle-campo-ancho">
                             <span class="campo-label">Descripción</span>
                             <span class="campo-valor">
                                 {{ producto.descripcion or 'Sin descripción registrada.' }}
                             </span>
                         </div>
-
                         <div class="detalle-campo">
                             <span class="campo-label">Fecha de registro</span>
                             <span class="campo-valor">
-                                {# strftime() formatea la fecha al estilo colombiano: 15/03/2025 #}
                                 {{ producto.fecha_creacion.strftime('%d/%m/%Y a las %H:%M') }}
                             </span>
                         </div>
-
                         <div class="detalle-campo">
                             <span class="campo-label">ID en sistema</span>
                             <span class="campo-valor mono-font">#{{ "%03d"|format(producto.id) }}</span>
                         </div>
-
                     </div>
                 </div>
             </div>
 
-            {# Tarjeta de stock visual #}
+            <!-- Estado del stock con barra visual -->
             <div class="detalle-card">
                 <div class="detalle-card-header">
                     <i class="bi bi-bar-chart me-2"></i>Estado del stock
                 </div>
                 <div class="detalle-card-body">
 
-                    {#
-                        Barra de progreso visual del stock.
-                        Calculamos un porcentaje asumiendo que 50 unidades = 100%.
-                        Si tiene más de 50, la barra llega al 100%.
-                    #}
                     {% set porcentaje = [producto.cantidad * 2, 100] | min %}
                     {% set color_barra = {
                         'critico': 'danger',
@@ -124,7 +103,6 @@
                             <span class="text-muted" style="font-size: 0.875rem;">unidades en stock</span>
                         </div>
 
-                        {# Barra de progreso de Bootstrap #}
                         <div class="progress" style="height: 12px; border-radius: 6px;">
                             <div class="progress-bar bg-{{ color_barra }}"
                                  style="width: {{ porcentaje }}%; border-radius: 6px;"
@@ -140,18 +118,15 @@
                         </div>
                     </div>
 
-                    {# Mensaje según el estado #}
                     {% if producto.estado_stock() == 'critico' %}
                     <div class="alerta-detalle alerta-detalle-critica">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i>
                         <strong>¡Stock crítico!</strong> Quedan solo {{ producto.cantidad }} unidades.
-                        Se recomienda reabastecer inmediatamente.
                     </div>
                     {% elif producto.estado_stock() == 'bajo' %}
                     <div class="alerta-detalle alerta-detalle-baja">
                         <i class="bi bi-exclamation-circle-fill me-2"></i>
                         <strong>Stock bajo.</strong> Quedan {{ producto.cantidad }} unidades.
-                        Considera hacer un pedido pronto.
                     </div>
                     {% else %}
                     <div class="alerta-detalle alerta-detalle-normal">
@@ -165,82 +140,65 @@
 
         </div>
 
-        {# ===== COLUMNA DERECHA: PRECIOS Y ACCIONES ===== #}
+        <!-- Columna derecha: precios y acciones -->
         <div class="col-12 col-lg-4">
 
-            {# Tarjeta de precios #}
+            <!-- Precios -->
             <div class="detalle-card mb-4">
                 <div class="detalle-card-header">
                     <i class="bi bi-currency-dollar me-2"></i>Precios e inventario
                 </div>
                 <div class="detalle-card-body">
-
                     <div class="precio-item">
                         <span class="precio-label">Precio unitario</span>
                         <span class="precio-valor">${{ "{:,.0f}".format(producto.precio) }}</span>
                     </div>
-
                     <div class="precio-divider"></div>
-
                     <div class="precio-item">
                         <span class="precio-label">Unidades en stock</span>
                         <span class="precio-valor mono-font">{{ producto.cantidad }}</span>
                     </div>
-
                     <div class="precio-divider"></div>
-
                     <div class="precio-item precio-total">
                         <span class="precio-label">Valor total del stock</span>
-                        {# valor_total() = precio × cantidad #}
                         <span class="precio-valor precio-destacado">
                             ${{ "{:,.0f}".format(producto.valor_total()) }}
                         </span>
                     </div>
-
                 </div>
             </div>
 
-            {# Tarjeta de acciones rápidas #}
+            <!-- Acciones rápidas -->
             <div class="detalle-card">
                 <div class="detalle-card-header">
                     <i class="bi bi-lightning me-2"></i>Acciones
                 </div>
                 <div class="detalle-card-body d-flex flex-column gap-2">
-
                     <a href="{{ url_for('editar_producto', id=producto.id) }}"
                        class="btn-accion-detalle btn-accion-editar">
-                        <i class="bi bi-pencil-square me-2"></i>
-                        Editar producto
+                        <i class="bi bi-pencil-square me-2"></i>Editar producto
                     </a>
 
-                    {# Formulario oculto para eliminar con POST #}
-                    <form method="POST"
-                          action="{{ url_for('eliminar_producto', id=producto.id) }}"
-                          id="form-eliminar">
+                    <form method="POST" action="{{ url_for('eliminar_producto', id=producto.id) }}" id="form-eliminar">
                         <button type="button"
                                 class="btn-accion-detalle btn-accion-eliminar w-100"
                                 onclick="confirmarEliminar('{{ producto.nombre }}')">
-                            <i class="bi bi-trash3 me-2"></i>
-                            Eliminar producto
+                            <i class="bi bi-trash3 me-2"></i>Eliminar producto
                         </button>
                     </form>
 
                     <a href="{{ url_for('lista_productos', categoria=producto.categoria) }}"
                        class="btn-accion-detalle btn-accion-ver">
-                        <i class="bi bi-funnel me-2"></i>
-                        Ver más de "{{ producto.categoria }}"
+                        <i class="bi bi-funnel me-2"></i>Ver más de "{{ producto.categoria }}"
                     </a>
 
-                    <a href="{{ url_for('historial') }}"
-                       class="btn-accion-detalle btn-accion-neutral">
-                        <i class="bi bi-clock-history me-2"></i>
-                        Ver historial
+                    <a href="{{ url_for('historial') }}" class="btn-accion-detalle btn-accion-neutral">
+                        <i class="bi bi-clock-history me-2"></i>Ver historial
                     </a>
-
                 </div>
             </div>
 
-            {# ===== AJUSTE RÁPIDO DE STOCK ===== #}
+            <!-- Ajuste rápido de stock -->
             <div class="detalle-card mt-4">
                 <div class="detalle-card-header">
                     <i class="bi bi-sliders me-2"></i>Ajuste rápido de stock
@@ -251,7 +209,6 @@
                     </p>
                     <form method="POST" action="{{ url_for('ajustar_stock', id=producto.id) }}">
                         <div class="d-flex gap-2 mb-3">
-                            {# Botones sumar / restar #}
                             <button type="button" class="btn-operacion activo" id="btn-sumar"
                                     onclick="setOperacion('sumar')">
                                 <i class="bi bi-plus-lg"></i> Entrada
@@ -260,7 +217,6 @@
                                     onclick="setOperacion('restar')">
                                 <i class="bi bi-dash-lg"></i> Salida
                             </button>
-                            {# Campo oculto que guarda la operación elegida #}
                             <input type="hidden" name="operacion" id="operacion-hidden" value="sumar">
                         </div>
                         <div class="d-flex gap-2 align-items-center">
@@ -284,14 +240,12 @@
 
 {% block scripts_extra %}
 <script>
-// Confirmación antes de eliminar
 function confirmarEliminar(nombre) {
     if (confirm('¿Estás seguro de que quieres eliminar "' + nombre + '"?\n\nEsta acción no se puede deshacer.')) {
         document.getElementById('form-eliminar').submit();
     }
 }
 
-// Ajuste de stock: toggle entre sumar y restar
 function setOperacion(op) {
     document.getElementById('operacion-hidden').value = op;
     document.getElementById('btn-sumar').classList.toggle('activo', op === 'sumar');
