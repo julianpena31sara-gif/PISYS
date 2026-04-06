@@ -1618,6 +1618,92 @@ code {
 
 .pred-link:hover { text-decoration: underline; }
 
+/* ------ TEMA OSCURO ------ */
+/* Se activa cuando el <body> tiene la clase "tema-oscuro" */
+body.tema-oscuro,
+html.tema-oscuro body {
+    --color-primario:       #3B82F6;
+    --color-primario-hover: #2563EB;
+    --color-primario-claro: #1E3A5F;
+
+    --color-critico:    #F87171;
+    --color-critico-bg: #2D1515;
+    --color-bajo:       #FBBF24;
+    --color-bajo-bg:    #2D2008;
+    --color-normal:     #4ADE80;
+    --color-normal-bg:  #0F2A1A;
+    --color-morado:     #A78BFA;
+    --color-morado-bg:  #1E1535;
+
+    --bg-principal: #0F172A;
+    --bg-card:      #1E293B;
+    --bg-navbar:    #1E293B;
+
+    --texto-principal:   #F1F5F9;
+    --texto-secundario:  #94A3B8;
+    --texto-muted:       #64748B;
+
+    --borde:       #334155;
+    --borde-suave: #1E293B;
+
+    --sombra-card:  0 1px 3px rgba(0,0,0,0.4),  0 1px 2px rgba(0,0,0,0.3);
+    --sombra-hover: 0 4px 6px rgba(0,0,0,0.35), 0 2px 4px rgba(0,0,0,0.3);
+}
+
+/* Transición suave al cambiar de tema */
+body {
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Inputs y selects en modo oscuro */
+body.tema-oscuro .input-custom,
+body.tema-oscuro .form-select,
+body.tema-oscuro .form-control {
+    background-color: #0F172A;
+    color: var(--texto-principal);
+    border-color: var(--borde);
+}
+
+body.tema-oscuro .input-custom::placeholder { color: var(--texto-muted); }
+
+/* Tablas Bootstrap en modo oscuro */
+body.tema-oscuro .tabla-productos td,
+body.tema-oscuro .tabla-productos th {
+    background-color: transparent;
+    color: var(--texto-principal);
+    border-color: var(--borde) !important;
+}
+
+body.tema-oscuro .fila-critico:hover { background-color: #2D1515 !important; }
+body.tema-oscuro .fila-bajo:hover    { background-color: #2D2008 !important; }
+body.tema-oscuro .fila-producto:hover { background-color: #263148 !important; }
+
+/* Badges Bootstrap en modo oscuro */
+body.tema-oscuro .badge.bg-light { background-color: #334155 !important; color: var(--texto-principal) !important; }
+
+/* ------ BOTÓN TOGGLE DE TEMA ------ */
+.btn-tema {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: 1px solid var(--borde);
+    background: transparent;
+    color: var(--texto-secundario);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all var(--transicion);
+    flex-shrink: 0;
+}
+
+.btn-tema:hover {
+    background: var(--color-primario-claro);
+    color: var(--color-primario);
+    border-color: var(--color-primario);
+}
+
 /* ------ RESPONSIVE ------ */
 @media (max-width: 576px) {
     .page-title {

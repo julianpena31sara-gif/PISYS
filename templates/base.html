@@ -12,6 +12,15 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/estilos.css') }}" rel="stylesheet">
     {% block estilos_extra %}{% endblock %}
+
+    {# Aplica el tema ANTES de pintar — evita el flash blanco al navegar #}
+    <script>
+        (function () {
+            if (localStorage.getItem('pisys-tema') === 'oscuro') {
+                document.documentElement.classList.add('tema-oscuro');
+            }
+        })();
+    </script>
 </head>
 <body>
 
@@ -62,6 +71,12 @@
                     </a>
                 </li>
                 <li class="nav-item ms-2">
+                    <button class="btn-tema" id="btn-tema" title="Cambiar tema"
+                            onclick="toggleTema()">
+                        <i class="bi bi-moon-fill" id="icono-tema"></i>
+                    </button>
+                </li>
+                <li class="nav-item ms-1">
                     <a class="btn btn-agregar" href="{{ url_for('nuevo_producto') }}">
                         <i class="bi bi-plus-lg me-1"></i>Nuevo Producto
                     </a>

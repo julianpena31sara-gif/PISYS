@@ -1,81 +1,63 @@
-// ============================================================
-// main.js — JavaScript del sistema PISYS
-// ============================================================
-// Por ahora este archivo es pequeño. En semanas posteriores
-// agregaremos más interactividad aquí:
-//   - Semana 6: confirmación de eliminación de productos
-//   - Semana 10: inicialización de gráficos Plotly
-// ============================================================
+// main.js — JavaScript principal de PISYS
 
-// Esperamos a que el HTML esté listo antes de ejecutar el código
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
 
-    console.log('✅ PISYS cargado correctamente');
+    console.log('✅ PISYS cargado');
 
-    // ------ AUTO-CERRAR ALERTAS FLASH ------
-    // Los mensajes de éxito/error de Flask se cierran solos
-    // después de 4 segundos para no molestar al usuario
-    const alertas = document.querySelectorAll('.alert');
-    alertas.forEach(function(alerta) {
-        setTimeout(function() {
-            // Bootstrap tiene una clase "fade" para animación de salida
+    // Auto-cerrar alertas flash después de 4 segundos
+    document.querySelectorAll('.alert').forEach(function (alerta) {
+        setTimeout(function () {
             alerta.classList.remove('show');
-            // Esperamos que termine la animación (300ms) y lo quitamos del DOM
-            setTimeout(function() {
-                alerta.remove();
-            }, 300);
-        }, 4000); // 4000ms = 4 segundos
+            setTimeout(() => alerta.remove(), 300);
+        }, 4000);
     });
 
-
-    // ------ RESALTAR FILA ACTIVA EN TABLA ------
-    // Cuando el mouse pasa sobre una fila de la tabla de productos,
-    // el CSS ya maneja el cambio de color (ver .fila-producto:hover).
-    // Aquí podríamos agregar lógica más avanzada si la necesitáramos.
-
-
-    // ------ NAVBAR: INDICADOR DE PÁGINA ACTIVA ------
-    // Bootstrap ya maneja esto con la clase 'active' en base.html,
-    // pero agregamos un console.log para depuración.
-    const linkActivo = document.querySelector('.nav-link.active');
-    if (linkActivo) {
-        console.log('📍 Página activa:', linkActivo.textContent.trim());
-    }
+    // Aplicar tema guardado al cargar la página
+    _aplicarTema(localStorage.getItem('pisys-tema') || 'claro');
 
 });
 
 
-// ============================================================
-// FUNCIONES DE UTILIDAD (para usar en semanas futuras)
-// ============================================================
+// ── MODO OSCURO / CLARO ──────────────────────────────────────
 
-/**
- * Formatea un número como moneda colombiana
- * Ej: formatearMoneda(1850000) → "$1.850.000"
- * 
- * En semana 10 la usaremos en los gráficos de Plotly.
- */
+function toggleTema() {
+    const temaActual = localStorage.getItem('pisys-tema') || 'claro';
+    const nuevoTema  = temaActual === 'claro' ? 'oscuro' : 'claro';
+    localStorage.setItem('pisys-tema', nuevoTema);
+    _aplicarTema(nuevoTema);
+}
+
+function _aplicarTema(tema) {
+    const body  = document.body;
+    const html  = document.documentElement;
+    const icono = document.getElementById('icono-tema');
+
+    if (tema === 'oscuro') {
+        body.classList.add('tema-oscuro');
+        html.classList.add('tema-oscuro');
+        if (icono) icono.classList.replace('bi-moon-fill', 'bi-sun-fill');
+    } else {
+        body.classList.remove('tema-oscuro');
+        html.classList.remove('tema-oscuro');
+        if (icono) icono.classList.replace('bi-sun-fill', 'bi-moon-fill');
+    }
+}
+
+
+// ── UTILIDADES ───────────────────────────────────────────────
+
 function formatearMoneda(numero) {
     return '$' + numero.toLocaleString('es-CO');
 }
 
-/**
- * Muestra una notificación temporal en la pantalla
- * Por ahora usamos los flash messages de Flask,
- * pero esta función será útil para acciones AJAX en el futuro.
- */
 function mostrarNotificacion(mensaje, tipo = 'success') {
     const notif = document.createElement('div');
     notif.className = `alert alert-${tipo} alert-dismissible fade show position-fixed`;
     notif.style.cssText = 'top: 80px; right: 20px; z-index: 9999; min-width: 300px;';
-    notif.innerHTML = `
-        ${mensaje}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
+    notif.innerHTML = `${mensaje}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
     document.body.appendChild(notif);
-
-    // Auto-eliminar después de 3 segundos
-    setTimeout(function() {
+    setTimeout(() => {
         notif.classList.remove('show');
         setTimeout(() => notif.remove(), 300);
     }, 3000);
