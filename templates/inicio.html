@@ -1,9 +1,11 @@
 {% extends "base.html" %}
+
 {% block titulo %}Inicio{% endblock %}
 
+{# Todo el contenido de la página va aquí dentro #}
 {% block contenido %}
 
-<!-- Header de bienvenida -->
+{# ===== HEADER DE BIENVENIDA ===== #}
 <div class="page-header">
     <div class="container-fluid px-4">
         <div class="row align-items-center">
@@ -14,6 +16,8 @@
                 </p>
             </div>
             <div class="col-auto">
+                {# Muestra fecha y hora actual usando Jinja2 #}
+
                 <span class="badge-fecha">
                     <i class="bi bi-calendar3 me-1"></i>
                     {{ moment if moment else "Sistema activo" }}
@@ -23,10 +27,12 @@
     </div>
 </div>
 
-<!-- Tarjetas de resumen (KPIs) -->
+{# ===== TARJETAS DE RESUMEN (KPIs) ===== #}
+
 <div class="container-fluid px-4 mt-4">
     <div class="row g-4">
 
+        {# Tarjeta 1: Total de productos #}
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="kpi-card kpi-azul">
                 <div class="kpi-icon">
@@ -39,6 +45,7 @@
             </div>
         </div>
 
+        {# Tarjeta 2: Alertas críticas #}
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="kpi-card {% if alertas_criticas %}kpi-rojo{% else %}kpi-verde{% endif %}">
                 <div class="kpi-icon">
@@ -51,6 +58,7 @@
             </div>
         </div>
 
+        {# Tarjeta 3: Stock bajo #}
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="kpi-card {% if alertas_bajas %}kpi-amarillo{% else %}kpi-verde{% endif %}">
                 <div class="kpi-icon">
@@ -63,12 +71,14 @@
             </div>
         </div>
 
+        {# Tarjeta 4: Valor total del inventario #}
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="kpi-card kpi-morado">
                 <div class="kpi-icon">
                     <i class="bi bi-currency-dollar"></i>
                 </div>
                 <div class="kpi-info">
+                    {# El filtro ',' formatea el número con separadores de miles #}
                     <span class="kpi-valor">
                         ${{ "{:,.0f}".format(valor_total_inventario) }}
                     </span>
@@ -80,12 +90,11 @@
     </div>
 </div>
 
-<!-- Sección de alertas -->
+{# ===== SECCIÓN DE ALERTAS ===== #}
 <div class="container-fluid px-4 mt-4">
     <div class="row g-4">
 
-        <!-- Alertas críticas (stock < 5) -->
-        <div class="col-12 col-lg-6">
+        {# --- Alertas críticas (stock < 5) --- #} <div class="col-12 col-lg-6">
             <div class="card-seccion">
                 <div class="card-seccion-header">
                     <div class="d-flex align-items-center gap-2">
@@ -95,6 +104,8 @@
                     <span class="badge bg-danger">{{ alertas_criticas | length }}</span>
                 </div>
                 <div class="card-seccion-body">
+
+
                     {% if alertas_criticas %}
                     {% for producto in alertas_criticas %}
                     <div class="alerta-item alerta-critica">
@@ -114,48 +125,51 @@
                         <p class="mb-0">¡Todo en orden! Sin alertas críticas.</p>
                     </div>
                     {% endif %}
+
                 </div>
             </div>
-        </div>
-
-        <!-- Alertas de stock bajo (entre 5 y 9) -->
-        <div class="col-12 col-lg-6">
-            <div class="card-seccion">
-                <div class="card-seccion-header">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="indicador-amarillo"></span>
-                        <h5 class="mb-0">Stock Bajo</h5>
-                    </div>
-                    <span class="badge bg-warning text-dark">{{ alertas_bajas | length }}</span>
-                </div>
-                <div class="card-seccion-body">
-                    {% if alertas_bajas %}
-                    {% for producto in alertas_bajas %}
-                    <div class="alerta-item alerta-baja">
-                        <div class="alerta-info">
-                            <span class="alerta-nombre">{{ producto.nombre }}</span>
-                            <span class="alerta-categoria">{{ producto.categoria }}</span>
-                        </div>
-                        <div class="alerta-stock">
-                            <span class="stock-numero stock-bajo">{{ producto.cantidad }}</span>
-                            <span class="stock-label">unid.</span>
-                        </div>
-                    </div>
-                    {% endfor %}
-                    {% else %}
-                    <div class="alerta-vacia">
-                        <i class="bi bi-check-circle-fill text-success fs-4"></i>
-                        <p class="mb-0">¡Stock saludable! Sin productos en nivel bajo.</p>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
     </div>
+
+    {# --- Alertas de stock bajo (entre 5 y 9) --- #}
+    <div class="col-12 col-lg-6">
+        <div class="card-seccion">
+            <div class="card-seccion-header">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="indicador-amarillo"></span>
+                    <h5 class="mb-0">Stock Bajo</h5>
+                </div>
+                <span class="badge bg-warning text-dark">{{ alertas_bajas | length }}</span>
+            </div>
+            <div class="card-seccion-body">
+
+                {% if alertas_bajas %}
+                {% for producto in alertas_bajas %}
+                <div class="alerta-item alerta-baja">
+                    <div class="alerta-info">
+                        <span class="alerta-nombre">{{ producto.nombre }}</span>
+                        <span class="alerta-categoria">{{ producto.categoria }}</span>
+                    </div>
+                    <div class="alerta-stock">
+                        <span class="stock-numero stock-bajo">{{ producto.cantidad }}</span>
+                        <span class="stock-label">unid.</span>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="alerta-vacia">
+                    <i class="bi bi-check-circle-fill text-success fs-4"></i>
+                    <p class="mb-0">¡Stock saludable! Sin productos en nivel bajo.</p>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+
+</div>
 </div>
 
-<!-- Accesos rápidos -->
+{# ===== ACCESOS RÁPIDOS ===== #}
 <div class="container-fluid px-4 mt-4 mb-5">
     <h5 class="seccion-titulo mb-3">Accesos Rápidos</h5>
     <div class="row g-3">
@@ -172,17 +186,15 @@
             </a>
         </div>
         <div class="col-6 col-md-3">
-            <a href="{{ url_for('reportes') }}" class="acceso-rapido acceso-deshabilitado">
+            <a href="{{ url_for('reportes') }}" class="acceso-rapido">
                 <i class="bi bi-file-pdf"></i>
                 <span>Generar reporte</span>
-                <small class="badge-pronto">Semana 7</small>
             </a>
         </div>
         <div class="col-6 col-md-3">
-            <a href="{{ url_for('dashboard') }}" class="acceso-rapido acceso-deshabilitado">
+            <a href="{{ url_for('dashboard') }}" class="acceso-rapido">
                 <i class="bi bi-graph-up"></i>
                 <span>Dashboard</span>
-                <small class="badge-pronto">Semana 10</small>
             </a>
         </div>
     </div>

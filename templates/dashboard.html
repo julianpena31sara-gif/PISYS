@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block titulo %}Dashboard{% endblock %}
+
+{% block contenido %}
+
+<div class="page-header">
+    <div class="container-fluid px-4">
+        <div class="row align-items-center">
+            <div class="col">
+                <h1 class="page-title">Dashboard</h1>
+                <p class="page-subtitle">Visualización del inventario en tiempo real</p>
+            </div>
+            <div class="col-auto">
+                <a href="{{ url_for('reportes') }}" class="btn-volver">
+                    <i class="bi bi-file-earmark-pdf me-1"></i>Generar reporte
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid px-4 mt-4 mb-5">
+
+    {# ===== KPIs ===== #}
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-azul">
+                <div class="kpi-icon"><i class="bi bi-box-seam-fill"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-valor">{{ total_productos }}</span>
+                    <span class="kpi-label">Productos registrados</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-morado">
+                <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-valor">${{ "{:,.0f}".format(valor_total_inventario) }}</span>
+                    <span class="kpi-label">Valor del inventario</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card {% if total_criticos > 0 %}kpi-rojo{% else %}kpi-verde{% endif %}">
+                <div class="kpi-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-valor">{{ total_criticos }}</span>
+                    <span class="kpi-label">Productos críticos</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-azul">
+                <div class="kpi-icon"><i class="bi bi-arrow-left-right"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-valor">{{ total_movimientos }}</span>
+                    <span class="kpi-label">Movimientos totales</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ===== ALERTAS PREDICTIVAS (Semana 11) ===== #}
+    {% if alertas_predictivas %}
+    <div class="card-seccion mb-4">
+        <div class="card-seccion-header">
+            <div class="d-flex align-items-center gap-2">
+                <span class="indicador-rojo"></span>
+                <h5 class="mb-0">Alertas Predictivas — Productos por agotarse</h5>
+            </div>
+            <span class="badge bg-danger">{{ alertas_predictivas | length }}</span>
+        </div>
+        <div class="card-seccion-body">
+            <div class="row g-3 p-3">
+                {% for alerta in alertas_predictivas %}
+                <div class="col-12 col-md-6 col-xl-4">
+                    <div class="alerta-predictiva alerta-pred-{{ alerta.urgencia }}">
+                        <div class="pred-header">
+                            <span class="pred-nombre">{{ alerta.producto.nombre }}</span>
+                            <span class="pred-badge {% if alerta.urgencia == 'critica' %}pred-badge-critica{% else %}pred-badge-adv{% endif %}">
+                                {% if alerta.urgencia == 'critica' %}
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>Urgente
+                                {% else %}
+                                    <i class="bi bi-exclamation-circle me-1"></i>Atención
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="pred-dias">
+                            <span class="pred-num">{{ alerta.dias_restantes }}</span>
+                            <span class="pred-unit">días de stock restante</span>
+                        </div>
+                        <div class="pred-barra-wrap">
+                            {% set pct = [((alerta.dias_restantes / 14) * 100), 100] | min %}
+                            <div class="pred-barra">
+                                <div class="pred-barra-fill pred-fill-{{ alerta.urgencia }}"
+                                     style="width: {{ pct }}%"></div>
+                            </div>
+                        </div>
+                        <div class="pred-info">
+                            <span>Stock actual: <strong>{{ alerta.producto.cantidad }}</strong> unid.</span>
+                            <span>Consumo: ~<strong>{{ alerta.promedio_diario }}</strong>/día</span>
+                        </div>
+                        <a href="{{ url_for('detalle_producto', id=alerta.producto.id) }}"
+                           class="pred-link">Ver producto →</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {# ===== GRÁFICOS ===== #}
+    <div class="row g-4">
+
+        {# Barras: stock por categoría #}
+        <div class="col-12 col-lg-7">
+            <div class="grafico-card">
+                <div class="grafico-header">
+                    <span><i class="bi bi-bar-chart me-2"></i>Stock por categoría</span>
+                </div>
+                <div class="grafico-body">
+                    <div id="graf-barras" style="height: 300px;"></div>
+                </div>
+            </div>
+        </div>
+
+        {# Pastel: distribución de valor #}
+        <div class="col-12 col-lg-5">
+            <div class="grafico-card">
+                <div class="grafico-header">
+                    <span><i class="bi bi-pie-chart me-2"></i>Valor por categoría</span>
+                </div>
+                <div class="grafico-body">
+                    <div id="graf-pastel" style="height: 300px;"></div>
+                </div>
+            </div>
+        </div>
+
+        {# Línea: movimientos últimos 30 días #}
+        <div class="col-12">
+            <div class="grafico-card">
+                <div class="grafico-header">
+                    <span><i class="bi bi-graph-up me-2"></i>Movimientos de stock — últimos 30 días</span>
+                </div>
+                <div class="grafico-body">
+                    <div id="graf-linea" style="height: 280px;"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts_extra %}
+{# Plotly via CDN — no necesitas instalar nada #}
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.32.0/plotly.min.js"></script>
+
+<script>
+// ============================================================
+// Transferimos los datos de Python/Flask a JavaScript.
+// Jinja2 convierte las listas Python en arrays JSON válidos.
+// tojson aplica el escape correcto para usarlos en JS.
+// ============================================================
+const catLabels   = {{ categorias_labels | tojson }};
+const catStock    = {{ categorias_stock  | tojson }};
+const catValor    = {{ categorias_valor  | tojson }};
+const pastelLbls  = {{ pastel_labels     | tojson }};
+const pastelVals  = {{ pastel_values     | tojson }};
+const diasLabels  = {{ dias_labels       | tojson }};
+const entradasV   = {{ entradas_vals     | tojson }};
+const salidasV    = {{ salidas_vals      | tojson }};
+
+// Paleta de colores coherente con el sistema (azul PISYS)
+const PALETA = [
+    '#2563EB','#7C3AED','#0891B2','#16A34A',
+    '#D97706','#DC2626','#9333EA','#0D9488'
+];
+
+// Config base para todos los gráficos (sin logos de Plotly, responsive)
+const CONFIG = { displayModeBar: false, responsive: true };
+
+// Fondo transparente para que combine con el card del sistema
+const LAYOUT_BASE = {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  'transparent',
+    font:          { family: 'DM Sans, sans-serif', size: 12, color: '#64748B' },
+    margin:        { t: 10, b: 40, l: 10, r: 10 },
+};
+
+
+// --- Gráfico 1: Barras de stock por categoría ---
+Plotly.newPlot('graf-barras', [{
+    type:        'bar',
+    x:           catLabels,
+    y:           catStock,
+    marker:      { color: PALETA },
+    hovertemplate: '<b>%{x}</b><br>Stock: %{y} unidades<extra></extra>',
+}], {
+    ...LAYOUT_BASE,
+    xaxis: { showgrid: false, zeroline: false },
+    yaxis: { gridcolor: '#F1F5F9', zeroline: false },
+    bargap: 0.35,
+}, CONFIG);
+
+
+// --- Gráfico 2: Pastel de distribución de valor ---
+Plotly.newPlot('graf-pastel', [{
+    type:        'pie',
+    labels:       pastelLbls,
+    values:       pastelVals,
+    marker:       { colors: PALETA },
+    hole:          0.42,          // Efecto donut
+    hovertemplate: '<b>%{label}</b><br>$%{value:,.0f}<br>%{percent}<extra></extra>',
+    textinfo:      'label+percent',
+    textfont:      { size: 11 },
+}], {
+    ...LAYOUT_BASE,
+    showlegend: false,
+    margin:     { t: 10, b: 10, l: 10, r: 10 },
+}, CONFIG);
+
+
+// --- Gráfico 3: Línea de movimientos últimos 30 días ---
+// Mostramos solo cada 5 días en el eje X para no saturarlo
+const diasFiltrados = diasLabels.map((d, i) => i % 5 === 0 ? d : '');
+
+Plotly.newPlot('graf-linea', [
+    {
+        name:            'Entradas',
+        type:            'scatter',
+        mode:            'lines+markers',
+        x:               diasLabels,
+        y:               entradasV,
+        line:            { color: '#16A34A', width: 2.5, shape: 'spline' },
+        marker:          { size: 4, color: '#16A34A' },
+        fill:            'tozeroy',
+        fillcolor:       'rgba(22,163,74,0.08)',
+        hovertemplate:   '%{x}<br>+%{y} unidades<extra>Entradas</extra>',
+    },
+    {
+        name:            'Salidas',
+        type:            'scatter',
+        mode:            'lines+markers',
+        x:               diasLabels,
+        y:               salidasV,
+        line:            { color: '#DC2626', width: 2.5, shape: 'spline' },
+        marker:          { size: 4, color: '#DC2626' },
+        fill:            'tozeroy',
+        fillcolor:       'rgba(220,38,38,0.08)',
+        hovertemplate:   '%{x}<br>-%{y} unidades<extra>Salidas</extra>',
+    }
+], {
+    ...LAYOUT_BASE,
+    margin:  { t: 10, b: 50, l: 40, r: 10 },
+    legend:  { orientation: 'h', y: -0.2, x: 0.5, xanchor: 'center' },
+    xaxis:   {
+        showgrid:    false,
+        zeroline:    false,
+        tickvals:    diasLabels.filter((_, i) => i % 5 === 0),
+        ticktext:    diasLabels.filter((_, i) => i % 5 === 0),
+    },
+    yaxis:   { gridcolor: '#F1F5F9', zeroline: false },
+}, CONFIG);
+</script>
+{% endblock %}

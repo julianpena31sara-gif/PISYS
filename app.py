@@ -6,7 +6,7 @@ from reportlab.lib import colors
 from reportlab.lib.units import cm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 import io
 
 app = Flask(__name__)
@@ -17,7 +17,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
+# ---------------------------------------------------------------------------
 # MODELOS
+# ---------------------------------------------------------------------------
+
 class Producto(db.Model):
     __tablename__ = 'producto'
 
@@ -33,10 +36,8 @@ class Producto(db.Model):
         return f'<Producto {self.nombre}>'
 
     def estado_stock(self):
-        if self.cantidad < 5:
-            return 'critico'
-        elif self.cantidad < 10:
-            return 'bajo'
+        if self.cantidad < 5:  return 'critico'
+        if self.cantidad < 10: return 'bajo'
         return 'normal'
 
     def valor_total(self):
@@ -48,7 +49,7 @@ class Movimiento(db.Model):
 
     id                = db.Column(db.Integer, primary_key=True)
     producto_id       = db.Column(db.Integer, db.ForeignKey('producto.id'), nullable=False)
-    tipo              = db.Column(db.String(20), nullable=False, default='ajuste')
+    tipo              = db.Column(db.String(20), nullable=False, default='ajuste')  # entrada | salida | ajuste | creacion
     cantidad_cambio   = db.Column(db.Integer, nullable=False)
     cantidad_anterior = db.Column(db.Integer, nullable=False)
     cantidad_nueva    = db.Column(db.Integer, nullable=False)
@@ -62,9 +63,12 @@ class Movimiento(db.Model):
         return f'<Movimiento {self.producto_id} {signo}{self.cantidad_cambio}>'
 
 
+# ---------------------------------------------------------------------------
 # HELPERS
+# ---------------------------------------------------------------------------
+
 def registrar_movimiento(producto, cantidad_anterior, tipo='ajuste', nota=None):
-    """Registra un movimiento de stock. No hace commit."""
+    """Registra un movimiento de stock. El commit lo hace el llamador."""
     cambio = producto.cantidad - cantidad_anterior
     if cambio == 0 and tipo != 'creacion':
         return
@@ -79,29 +83,31 @@ def registrar_movimiento(producto, cantidad_anterior, tipo='ajuste', nota=None):
 
 
 def _estilos_pdf():
-    """Estilos ReportLab reutilizables."""
+    """Estilos ReportLab reutilizables en todos los reportes."""
     base = getSampleStyleSheet()
     return {
-        'titulo': ParagraphStyle('titulo', parent=base['Title'],
-                                 fontSize=20, textColor=colors.HexColor('#1E3A5F'), spaceAfter=4),
+        'titulo':    ParagraphStyle('titulo',    parent=base['Title'],
+                                    fontSize=20, textColor=colors.HexColor('#1E3A5F'), spaceAfter=4),
         'subtitulo': ParagraphStyle('subtitulo', parent=base['Normal'],
                                     fontSize=10, textColor=colors.HexColor('#64748B'), spaceAfter=2),
-        'seccion': ParagraphStyle('seccion', parent=base['Normal'],
-                                  fontSize=12, fontName='Helvetica-Bold',
-                                  textColor=colors.HexColor('#1E3A5F'), spaceBefore=14, spaceAfter=6),
-        'normal': ParagraphStyle('normal', parent=base['Normal'],
-                                 fontSize=9, textColor=colors.HexColor('#374151')),
-        'pie': ParagraphStyle('pie', parent=base['Normal'],
-                              fontSize=8, textColor=colors.HexColor('#9CA3AF'), alignment=TA_CENTER),
+        'seccion':   ParagraphStyle('seccion',   parent=base['Normal'],
+                                    fontSize=12, fontName='Helvetica-Bold',
+                                    textColor=colors.HexColor('#1E3A5F'), spaceBefore=14, spaceAfter=6),
+        'normal':    ParagraphStyle('normal',    parent=base['Normal'],
+                                    fontSize=9,  textColor=colors.HexColor('#374151')),
+        'pie':       ParagraphStyle('pie',       parent=base['Normal'],
+                                    fontSize=8,  textColor=colors.HexColor('#9CA3AF'), alignment=TA_CENTER),
+        'derecha':   ParagraphStyle('derecha',   parent=base['Normal'],
+                                    fontSize=9,  textColor=colors.HexColor('#374151'), alignment=TA_RIGHT),
     }
 
 
-def _encabezado_pdf(elementos, estilos, titulo_reporte, subtitulo_reporte):
-    """Encabezado estándar para PDFs."""
+def _encabezado_pdf(elementos, estilos, titulo, subtitulo):
+    """Encabezado estándar de todos los reportes."""
     elementos.append(Paragraph('PISYS', estilos['titulo']))
-    elementos.append(Paragraph(titulo_reporte, estilos['seccion']))
+    elementos.append(Paragraph(titulo, estilos['seccion']))
     elementos.append(Paragraph(
-        f'{subtitulo_reporte} &nbsp;·&nbsp; Generado: {datetime.now().strftime("%d/%m/%Y %H:%M")}',
+        f'{subtitulo} &nbsp;·&nbsp; Generado: {datetime.now().strftime("%d/%m/%Y %H:%M")}',
         estilos['subtitulo']
     ))
     elementos.append(HRFlowable(width='100%', thickness=1,
@@ -109,23 +115,23 @@ def _encabezado_pdf(elementos, estilos, titulo_reporte, subtitulo_reporte):
 
 
 def _estilo_tabla_base():
-    """TableStyle base para tablas PDF."""
+    """Encabezado azul oscuro + filas alternas gris claro."""
     return TableStyle([
-        ('BACKGROUND',    (0, 0), (-1, 0),  colors.HexColor('#1E3A5F')),
-        ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
-        ('FONTNAME',      (0, 0), (-1, 0),  'Helvetica-Bold'),
-        ('FONTSIZE',      (0, 0), (-1, 0),  9),
-        ('FONTNAME',      (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE',      (0, 1), (-1, -1), 8),
+        ('BACKGROUND', (0, 0), (-1, 0),  colors.HexColor('#1E3A5F')),
+        ('TEXTCOLOR',  (0, 0), (-1, 0),  colors.white),
+        ('FONTNAME',   (0, 0), (-1, 0),  'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 0), (-1, 0),  9),
+        ('FONTNAME',   (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE',   (0, 1), (-1, -1), 8),
         ('ROWBACKGROUND', (0, 2), (-1, -1), colors.HexColor('#F8FAFC')),
-        ('GRID',          (0, 0), (-1, -1), 0.4, colors.HexColor('#E2E8F0')),
-        ('PADDING',       (0, 0), (-1, -1), 6),
-        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID',       (0, 0), (-1, -1), 0.4, colors.HexColor('#E2E8F0')),
+        ('PADDING',    (0, 0), (-1, -1), 6),
+        ('VALIGN',     (0, 0), (-1, -1), 'MIDDLE'),
     ])
 
 
 def _enviar_pdf(buffer, filename):
-    """Convierte buffer en respuesta Flask con cabeceras PDF."""
+    """Convierte el buffer en una respuesta HTTP con tipo PDF."""
     buffer.seek(0)
     response = make_response(buffer.read())
     response.headers['Content-Type']        = 'application/pdf'
@@ -137,20 +143,24 @@ CATEGORIAS = ['Electrónica', 'Papelería', 'Mobiliario', 'Limpieza',
               'Alimentos', 'Ropa', 'Herramientas', 'General']
 
 
-# RUTAS PRINCIPALES
+# ---------------------------------------------------------------------------
+# RUTAS — INICIO
+# ---------------------------------------------------------------------------
+
 @app.route('/')
 def inicio():
-    total_productos        = Producto.query.count()
-    alertas_criticas       = Producto.query.filter(Producto.cantidad < 5).all()
-    alertas_bajas          = Producto.query.filter(Producto.cantidad >= 5, Producto.cantidad < 10).all()
-    valor_total_inventario = sum(p.valor_total() for p in Producto.query.all())
-
+    productos = Producto.query.all()
     return render_template('inicio.html',
-                           total_productos=total_productos,
-                           alertas_criticas=alertas_criticas,
-                           alertas_bajas=alertas_bajas,
-                           valor_total_inventario=valor_total_inventario)
+        total_productos        = Producto.query.count(),
+        alertas_criticas       = [p for p in productos if p.estado_stock() == 'critico'],
+        alertas_bajas          = [p for p in productos if p.estado_stock() == 'bajo'],
+        valor_total_inventario = sum(p.valor_total() for p in productos)
+    )
 
+
+# ---------------------------------------------------------------------------
+# RUTAS — PRODUCTOS (CRUD)
+# ---------------------------------------------------------------------------
 
 @app.route('/productos')
 def lista_productos():
@@ -169,8 +179,9 @@ def lista_productos():
     categorias = [c[0] for c in db.session.query(Producto.categoria)
                                           .distinct().order_by(Producto.categoria).all() if c[0]]
 
-    return render_template('productos.html', productos=productos,
-                           categorias=categorias, buscar=buscar, categoria_activa=categoria)
+    return render_template('productos.html',
+                           productos=productos, categorias=categorias,
+                           buscar=buscar, categoria_activa=categoria)
 
 
 @app.route('/productos/<int:id>')
@@ -178,7 +189,6 @@ def detalle_producto(id):
     return render_template('detalle.html', producto=Producto.query.get_or_404(id))
 
 
-# CRUD
 @app.route('/productos/nuevo', methods=['GET', 'POST'])
 def nuevo_producto():
     if request.method == 'POST':
@@ -190,12 +200,13 @@ def nuevo_producto():
             precio   = float(request.form.get('precio', 0))
             cantidad = int(request.form.get('cantidad', 0))
         except ValueError:
-            flash('❌ Precio y cantidad deben ser números válidos.', 'danger')
+            flash('❌ El precio y la cantidad deben ser números válidos.', 'danger')
             return render_template('formulario.html', titulo='Nuevo Producto',
                                    categorias=CATEGORIAS, producto=None)
 
         errores = []
         if not nombre:           errores.append('El nombre es obligatorio.')
+        if len(nombre) > 100:    errores.append('El nombre no puede superar 100 caracteres.')
         if precio < 0:           errores.append('El precio no puede ser negativo.')
         if cantidad < 0:         errores.append('La cantidad no puede ser negativa.')
 
@@ -203,18 +214,19 @@ def nuevo_producto():
             for e in errores: flash(f'❌ {e}', 'danger')
             return render_template('formulario.html', titulo='Nuevo Producto',
                                    categorias=CATEGORIAS,
-                                   producto=dict(nombre=nombre, descripcion=descripcion,
-                                                 precio=precio, cantidad=cantidad, categoria=categoria))
+                                   producto={'nombre': nombre, 'descripcion': descripcion,
+                                             'precio': precio, 'cantidad': cantidad, 'categoria': categoria})
 
         nuevo = Producto(nombre=nombre, descripcion=descripcion,
                          precio=precio, cantidad=cantidad, categoria=categoria)
         db.session.add(nuevo)
-        db.session.flush()
+        db.session.flush()  # obtiene el ID antes del commit
+
         if nuevo.cantidad > 0:
             registrar_movimiento(nuevo, 0, tipo='creacion', nota='Stock inicial')
-        db.session.commit()
 
-        flash(f'✅ Producto "{nombre}" creado.', 'success')
+        db.session.commit()
+        flash(f'✅ Producto "{nombre}" creado exitosamente.', 'success')
         return redirect(url_for('lista_productos'))
 
     return render_template('formulario.html', titulo='Nuevo Producto',
@@ -234,14 +246,15 @@ def editar_producto(id):
             precio   = float(request.form.get('precio', 0))
             cantidad = int(request.form.get('cantidad', 0))
         except ValueError:
-            flash('❌ Precio y cantidad deben ser números válidos.', 'danger')
+            flash('❌ El precio y la cantidad deben ser números válidos.', 'danger')
             return render_template('formulario.html', titulo=f'Editar: {producto.nombre}',
                                    categorias=CATEGORIAS, producto=producto)
 
         errores = []
-        if not nombre:   errores.append('El nombre es obligatorio.')
-        if precio < 0:   errores.append('El precio no puede ser negativo.')
-        if cantidad < 0: errores.append('La cantidad no puede ser negativa.')
+        if not nombre:        errores.append('El nombre es obligatorio.')
+        if len(nombre) > 100: errores.append('El nombre no puede superar 100 caracteres.')
+        if precio < 0:        errores.append('El precio no puede ser negativo.')
+        if cantidad < 0:      errores.append('La cantidad no puede ser negativa.')
 
         if errores:
             for e in errores: flash(f'❌ {e}', 'danger')
@@ -256,11 +269,11 @@ def editar_producto(id):
         producto.categoria   = categoria
 
         if cantidad != cantidad_anterior:
-            registrar_movimiento(producto, cantidad_anterior, tipo='ajuste',
-                                 nota='Modificación desde formulario')
-        db.session.commit()
+            registrar_movimiento(producto, cantidad_anterior,
+                                 tipo='ajuste', nota='Modificación desde formulario')
 
-        flash(f'✅ Producto "{nombre}" actualizado.', 'success')
+        db.session.commit()
+        flash(f'✅ Producto "{nombre}" actualizado correctamente.', 'success')
         return redirect(url_for('detalle_producto', id=producto.id))
 
     return render_template('formulario.html', titulo=f'Editar: {producto.nombre}',
@@ -292,15 +305,15 @@ def ajustar_stock(id):
         flash('❌ La cantidad debe ser mayor a 0.', 'danger')
         return redirect(url_for('detalle_producto', id=id))
 
-    operacion         = request.form.get('operacion', 'sumar')
     cantidad_anterior = producto.cantidad
+    operacion         = request.form.get('operacion', 'sumar')
 
     if operacion == 'sumar':
         producto.cantidad += cantidad_ajuste
         tipo, nota = 'entrada', f'Entrada de {cantidad_ajuste} unidades'
     else:
         if producto.cantidad - cantidad_ajuste < 0:
-            flash(f'❌ Stock insuficiente. Solo hay {producto.cantidad} unidades.', 'danger')
+            flash(f'❌ No puedes restar {cantidad_ajuste}. Solo hay {producto.cantidad} en stock.', 'danger')
             return redirect(url_for('detalle_producto', id=id))
         producto.cantidad -= cantidad_ajuste
         tipo, nota = 'salida', f'Salida de {cantidad_ajuste} unidades'
@@ -311,7 +324,10 @@ def ajustar_stock(id):
     return redirect(url_for('detalle_producto', id=id))
 
 
-# HISTORIAL
+# ---------------------------------------------------------------------------
+# RUTAS — HISTORIAL
+# ---------------------------------------------------------------------------
+
 @app.route('/historial')
 def historial():
     pagina      = request.args.get('pagina', 1, type=int)
@@ -327,40 +343,45 @@ def historial():
     return render_template('historial.html', movimientos=movimientos, tipo_filtro=tipo_filtro)
 
 
-# REPORTES PDF
+# ---------------------------------------------------------------------------
+# RUTAS — REPORTES PDF (Semanas 7, 8 y 9)
+# ---------------------------------------------------------------------------
+
 @app.route('/reportes')
 def reportes():
     productos = Producto.query.all()
+    categorias = [c[0] for c in db.session.query(Producto.categoria)
+                                          .distinct().order_by(Producto.categoria).all() if c[0]]
     return render_template('reportes.html',
-                           total_productos=len(productos),
-                           valor_total=sum(p.valor_total() for p in productos),
-                           criticos=[p for p in productos if p.estado_stock() == 'critico'],
-                           bajos=[p for p in productos if p.estado_stock() == 'bajo'],
-                           categorias=[c[0] for c in db.session.query(Producto.categoria)
-                                                               .distinct().order_by(Producto.categoria)
-                                                               .all() if c[0]])
+        total_productos = len(productos),
+        valor_total     = sum(p.valor_total() for p in productos),
+        criticos        = len([p for p in productos if p.estado_stock() == 'critico']),
+        bajos           = len([p for p in productos if p.estado_stock() == 'bajo']),
+        categorias      = categorias
+    )
 
 
 @app.route('/reportes/inventario')
 def reporte_inventario():
-    """PDF con inventario completo. Acepta ?categoria= para filtrar."""
+    """Semana 8 — PDF completo de inventario con colores por estado y resumen."""
     categoria_filtro = request.args.get('categoria', '')
+
     consulta = Producto.query
     if categoria_filtro:
         consulta = consulta.filter(Producto.categoria == categoria_filtro)
     productos = consulta.order_by(Producto.categoria, Producto.nombre).all()
 
-    buffer    = io.BytesIO()
-    doc       = SimpleDocTemplate(buffer, pagesize=letter,
-                                  leftMargin=2*cm, rightMargin=2*cm,
-                                  topMargin=2*cm, bottomMargin=2*cm)
+    buffer  = io.BytesIO()
+    doc     = SimpleDocTemplate(buffer, pagesize=letter,
+                                leftMargin=2*cm, rightMargin=2*cm,
+                                topMargin=2*cm,  bottomMargin=2*cm)
     estilos   = _estilos_pdf()
     elementos = []
 
     subtitulo = f'Categoría: {categoria_filtro}' if categoria_filtro else 'Todos los productos'
     _encabezado_pdf(elementos, estilos, 'Reporte de Inventario', subtitulo)
 
-    # Tabla de productos
+    # Tabla principal
     filas = [['#', 'Producto', 'Categoría', 'Precio', 'Stock', 'Valor total', 'Estado']]
     for p in productos:
         estado = {'critico': 'CRÍTICO', 'bajo': 'BAJO', 'normal': 'Normal'}[p.estado_stock()]
@@ -368,8 +389,12 @@ def reporte_inventario():
                       p.categoria or '—', f'${p.precio:,.0f}',
                       str(p.cantidad), f'${p.valor_total():,.0f}', estado])
 
-    tabla = Table(filas, colWidths=[1*cm, 5.5*cm, 3*cm, 2.5*cm, 1.5*cm, 2.5*cm, 2*cm], repeatRows=1)
+    tabla = Table(filas,
+                  colWidths=[1*cm, 5.5*cm, 3*cm, 2.5*cm, 1.5*cm, 2.5*cm, 2*cm],
+                  repeatRows=1)
     estilo = _estilo_tabla_base()
+
+    # Colorear filas según estado de stock
     for i, p in enumerate(productos, start=1):
         if p.estado_stock() == 'critico':
             estilo.add('BACKGROUND', (0, i), (-1, i), colors.HexColor('#FEF2F2'))
@@ -382,28 +407,28 @@ def reporte_inventario():
     tabla.setStyle(estilo)
     elementos.append(tabla)
 
-    # Tabla resumen al pie
+    # Resumen ejecutivo
     elementos.append(Spacer(1, 0.5*cm))
     elementos.append(HRFlowable(width='100%', thickness=0.5,
                                 color=colors.HexColor('#E2E8F0'), spaceAfter=8))
-    valor_total   = sum(p.valor_total() for p in productos)
-    resumen_data  = [
-        ['Total productos', 'Valor inventario', 'Críticos', 'Stock bajo'],
-        [str(len(productos)), f'${valor_total:,.0f}',
-         str(len([p for p in productos if p.estado_stock() == 'critico'])),
-         str(len([p for p in productos if p.estado_stock() == 'bajo']))],
-    ]
-    t_resumen = Table(resumen_data, colWidths=[4.5*cm]*4)
-    t_resumen.setStyle(TableStyle([
+    criticos = len([p for p in productos if p.estado_stock() == 'critico'])
+    bajos    = len([p for p in productos if p.estado_stock() == 'bajo'])
+    resumen  = Table(
+        [['Total productos', 'Valor inventario', 'Críticos', 'Stock bajo'],
+         [str(len(productos)), f'${sum(p.valor_total() for p in productos):,.0f}',
+          str(criticos), str(bajos)]],
+        colWidths=[4.5*cm] * 4
+    )
+    resumen.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F1F5F9')),
         ('FONTNAME',   (0, 0), (-1, -1), 'Helvetica-Bold'),
         ('FONTSIZE',   (0, 0), (-1, -1), 9),
-        ('TEXTCOLOR',  (0, 1), (-1, 1), colors.HexColor('#1E3A5F')),
+        ('TEXTCOLOR',  (0, 1), (-1, 1),  colors.HexColor('#1E3A5F')),
         ('ALIGN',      (0, 0), (-1, -1), 'CENTER'),
         ('GRID',       (0, 0), (-1, -1), 0.4, colors.HexColor('#E2E8F0')),
         ('PADDING',    (0, 0), (-1, -1), 8),
     ]))
-    elementos.append(t_resumen)
+    elementos.append(resumen)
     elementos.append(Spacer(1, 0.3*cm))
     elementos.append(Paragraph('PISYS — Reporte generado automáticamente', estilos['pie']))
 
@@ -413,14 +438,14 @@ def reporte_inventario():
 
 @app.route('/reportes/alertas')
 def reporte_alertas():
-    """PDF solo con productos en estado crítico o bajo."""
+    """Semana 8 — PDF de productos con stock crítico o bajo."""
     productos_alerta = Producto.query.filter(Producto.cantidad < 10) \
                                      .order_by(Producto.cantidad).all()
 
-    buffer    = io.BytesIO()
-    doc       = SimpleDocTemplate(buffer, pagesize=letter,
-                                  leftMargin=2*cm, rightMargin=2*cm,
-                                  topMargin=2*cm, bottomMargin=2*cm)
+    buffer  = io.BytesIO()
+    doc     = SimpleDocTemplate(buffer, pagesize=letter,
+                                leftMargin=2*cm, rightMargin=2*cm,
+                                topMargin=2*cm,  bottomMargin=2*cm)
     estilos   = _estilos_pdf()
     elementos = []
 
@@ -434,17 +459,18 @@ def reporte_alertas():
         for p in productos_alerta:
             estado = 'CRÍTICO' if p.estado_stock() == 'critico' else 'BAJO'
             filas.append([str(p.id), Paragraph(p.nombre, estilos['normal']),
-                          p.categoria or '—', str(p.cantidad), estado, f'${p.valor_total():,.0f}'])
+                          p.categoria or '—', str(p.cantidad), estado,
+                          f'${p.valor_total():,.0f}'])
 
-        tabla = Table(filas, colWidths=[1*cm, 6*cm, 3*cm, 2*cm, 2.5*cm, 3*cm], repeatRows=1)
+        tabla = Table(filas,
+                      colWidths=[1*cm, 6*cm, 3*cm, 2*cm, 2.5*cm, 3*cm],
+                      repeatRows=1)
         estilo = _estilo_tabla_base()
         for i, p in enumerate(productos_alerta, start=1):
-            c_fondo = colors.HexColor('#FEF2F2') if p.estado_stock() == 'critico' \
-                      else colors.HexColor('#FFFBEB')
-            c_texto = colors.HexColor('#DC2626') if p.estado_stock() == 'critico' \
-                      else colors.HexColor('#D97706')
-            estilo.add('BACKGROUND', (0, i), (-1, i), c_fondo)
-            estilo.add('TEXTCOLOR',  (4, i), (4, i),  c_texto)
+            c_bg   = colors.HexColor('#FEF2F2') if p.estado_stock() == 'critico' else colors.HexColor('#FFFBEB')
+            c_text = colors.HexColor('#DC2626') if p.estado_stock() == 'critico' else colors.HexColor('#D97706')
+            estilo.add('BACKGROUND', (0, i), (-1, i), c_bg)
+            estilo.add('TEXTCOLOR',  (4, i), (4, i),  c_text)
             estilo.add('FONTNAME',   (4, i), (4, i),  'Helvetica-Bold')
         tabla.setStyle(estilo)
         elementos.append(tabla)
@@ -455,13 +481,196 @@ def reporte_alertas():
     return _enviar_pdf(buffer, 'alertas.pdf')
 
 
-# DASHBOARD
+@app.route('/reportes/historial')
+def reporte_historial():
+    """Semana 9 — PDF del historial de movimientos con resumen por tipo."""
+    tipo_filtro = request.args.get('tipo', '')
+
+    consulta = Movimiento.query
+    if tipo_filtro:
+        consulta = consulta.filter(Movimiento.tipo == tipo_filtro)
+    movimientos = consulta.order_by(Movimiento.fecha.desc()).all()
+
+    buffer  = io.BytesIO()
+    doc     = SimpleDocTemplate(buffer, pagesize=letter,
+                                leftMargin=2*cm, rightMargin=2*cm,
+                                topMargin=2*cm,  bottomMargin=2*cm)
+    estilos   = _estilos_pdf()
+    elementos = []
+
+    subtitulo = f'Tipo: {tipo_filtro.capitalize()}' if tipo_filtro else 'Todos los movimientos'
+    _encabezado_pdf(elementos, estilos, 'Historial de Movimientos', subtitulo)
+
+    if not movimientos:
+        elementos.append(Paragraph('No hay movimientos registrados aún.', estilos['normal']))
+    else:
+        filas = [['Fecha', 'Producto', 'Tipo', 'Antes', 'Cambio', 'Después', 'Nota']]
+        for m in movimientos:
+            signo  = '+' if m.cantidad_cambio > 0 else ''
+            cambio = f'{signo}{m.cantidad_cambio}'
+            filas.append([
+                m.fecha.strftime('%d/%m/%Y %H:%M'),
+                Paragraph(m.producto.nombre, estilos['normal']),
+                m.tipo.capitalize(),
+                str(m.cantidad_anterior),
+                cambio,
+                str(m.cantidad_nueva),
+                Paragraph(m.nota or '—', estilos['normal']),
+            ])
+
+        tabla = Table(filas,
+                      colWidths=[3*cm, 4.5*cm, 2*cm, 1.5*cm, 1.8*cm, 1.8*cm, 3.4*cm],
+                      repeatRows=1)
+        estilo = _estilo_tabla_base()
+        for i, m in enumerate(movimientos, start=1):
+            if m.cantidad_cambio > 0:
+                estilo.add('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#16A34A'))
+                estilo.add('FONTNAME',  (4, i), (4, i), 'Helvetica-Bold')
+            elif m.cantidad_cambio < 0:
+                estilo.add('TEXTCOLOR', (4, i), (4, i), colors.HexColor('#DC2626'))
+                estilo.add('FONTNAME',  (4, i), (4, i), 'Helvetica-Bold')
+        tabla.setStyle(estilo)
+        elementos.append(tabla)
+
+        # Resumen de totales por tipo
+        elementos.append(Spacer(1, 0.5*cm))
+        elementos.append(Paragraph('Resumen', estilos['seccion']))
+        entradas  = sum(m.cantidad_cambio for m in movimientos if m.cantidad_cambio > 0)
+        salidas   = sum(abs(m.cantidad_cambio) for m in movimientos if m.cantidad_cambio < 0)
+        resumen   = Table(
+            [['Total movimientos', 'Unidades ingresadas', 'Unidades salidas', 'Balance neto'],
+             [str(len(movimientos)), f'+{entradas}', f'-{salidas}', f'{entradas - salidas:+}']],
+            colWidths=[4.5*cm] * 4
+        )
+        resumen.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F1F5F9')),
+            ('FONTNAME',   (0, 0), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE',   (0, 0), (-1, -1), 9),
+            ('ALIGN',      (0, 0), (-1, -1), 'CENTER'),
+            ('GRID',       (0, 0), (-1, -1), 0.4, colors.HexColor('#E2E8F0')),
+            ('PADDING',    (0, 0), (-1, -1), 8),
+            ('TEXTCOLOR',  (1, 1), (1, 1), colors.HexColor('#16A34A')),
+            ('TEXTCOLOR',  (2, 1), (2, 1), colors.HexColor('#DC2626')),
+        ]))
+        elementos.append(resumen)
+
+    elementos.append(Spacer(1, 0.3*cm))
+    elementos.append(Paragraph('PISYS — Historial de movimientos', estilos['pie']))
+    doc.build(elementos)
+    return _enviar_pdf(buffer, 'historial.pdf')
+
+
+# ---------------------------------------------------------------------------
+# RUTAS — DASHBOARD Y ALERTAS PREDICTIVAS (Semanas 10 y 11)
+# ---------------------------------------------------------------------------
+
 @app.route('/dashboard')
 def dashboard():
-    return render_template('dashboard.html')
+    productos  = Producto.query.all()
+    movimientos = Movimiento.query.order_by(Movimiento.fecha.desc()).all()
+
+    # --- KPIs generales ---
+    total_productos        = len(productos)
+    valor_total_inventario = sum(p.valor_total() for p in productos)
+    total_criticos         = len([p for p in productos if p.estado_stock() == 'critico'])
+    total_movimientos      = len(movimientos)
+
+    # --- Gráfico 1: stock por categoría ---
+    # Agrupamos cantidad total por categoría para las barras
+    from collections import defaultdict
+    stock_por_cat = defaultdict(int)
+    valor_por_cat = defaultdict(float)
+    for p in productos:
+        cat = p.categoria or 'General'
+        stock_por_cat[cat] += p.cantidad
+        valor_por_cat[cat] += p.valor_total()
+
+    categorias_labels = list(stock_por_cat.keys())
+    categorias_stock  = [stock_por_cat[c] for c in categorias_labels]
+    categorias_valor  = [round(valor_por_cat[c], 0) for c in categorias_labels]
+
+    # --- Gráfico 2: distribución de valor (pastel) ---
+    pastel_labels = categorias_labels
+    pastel_values = categorias_valor
+
+    # --- Gráfico 3: movimientos por día (últimos 30 días) ---
+    from datetime import timedelta
+    from collections import Counter
+    hace_30 = datetime.utcnow() - timedelta(days=30)
+    movs_recientes = Movimiento.query.filter(Movimiento.fecha >= hace_30).all()
+
+    entradas_por_dia = Counter()
+    salidas_por_dia  = Counter()
+    for m in movs_recientes:
+        dia = m.fecha.strftime('%d/%m')
+        if m.cantidad_cambio > 0:
+            entradas_por_dia[dia] += m.cantidad_cambio
+        else:
+            salidas_por_dia[dia]  += abs(m.cantidad_cambio)
+
+    # Generar eje X con todos los días del rango
+    dias_labels = []
+    for i in range(29, -1, -1):
+        dia = (datetime.utcnow() - timedelta(days=i)).strftime('%d/%m')
+        dias_labels.append(dia)
+    entradas_vals = [entradas_por_dia.get(d, 0) for d in dias_labels]
+    salidas_vals  = [salidas_por_dia.get(d, 0)  for d in dias_labels]
+
+    # --- Semana 11: Alertas predictivas ---
+    # Algoritmo simple: promedio de salidas diarias de los últimos 30 días.
+    # Si el stock actual / promedio_diario < 7 días → alerta "se agota pronto".
+    alertas_predictivas = []
+    for p in productos:
+        salidas_producto = [
+            abs(m.cantidad_cambio)
+            for m in p.movimientos
+            if m.cantidad_cambio < 0
+            and m.fecha >= hace_30
+        ]
+        if not salidas_producto:
+            continue
+
+        promedio_diario = sum(salidas_producto) / 30
+        if promedio_diario <= 0:
+            continue
+
+        dias_restantes = p.cantidad / promedio_diario
+
+        if dias_restantes <= 14:  # Menos de 2 semanas
+            alertas_predictivas.append({
+                'producto':       p,
+                'dias_restantes': round(dias_restantes, 1),
+                'promedio_diario': round(promedio_diario, 1),
+                'urgencia':       'critica' if dias_restantes <= 7 else 'advertencia'
+            })
+
+    # Ordenar: primero los más urgentes
+    alertas_predictivas.sort(key=lambda x: x['dias_restantes'])
+
+    return render_template('dashboard.html',
+        # KPIs
+        total_productos        = total_productos,
+        valor_total_inventario = valor_total_inventario,
+        total_criticos         = total_criticos,
+        total_movimientos      = total_movimientos,
+        # Datos para gráficos (se pasan como listas Python → JSON en el template)
+        categorias_labels = categorias_labels,
+        categorias_stock  = categorias_stock,
+        categorias_valor  = categorias_valor,
+        pastel_labels     = pastel_labels,
+        pastel_values     = pastel_values,
+        dias_labels       = dias_labels,
+        entradas_vals     = entradas_vals,
+        salidas_vals      = salidas_vals,
+        # Alertas predictivas
+        alertas_predictivas = alertas_predictivas,
+    )
 
 
+# ---------------------------------------------------------------------------
 # ARRANQUE
+# ---------------------------------------------------------------------------
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
