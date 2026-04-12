@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block titulo %}Carga Masiva{% endblock %}
+
+{% block contenido %}
+
+<div class="page-header">
+    <div class="container-fluid px-4">
+        <nav class="breadcrumb-custom mb-2">
+            <a href="{{ url_for('inicio') }}"><i class="bi bi-house-door me-1"></i>Inicio</a>
+            <span class="breadcrumb-sep">/</span>
+            <a href="{{ url_for('lista_productos') }}">Productos</a>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-actual">Carga Masiva</span>
+        </nav>
+        <h1 class="page-title">Carga Masiva desde Excel</h1>
+        <p class="page-subtitle">Sube hasta 500 productos de una sola vez</p>
+    </div>
+</div>
+
+<div class="container-fluid px-4 mt-4 mb-5">
+    <div class="row g-4">
+
+        {# ===== COLUMNA IZQUIERDA: INSTRUCCIONES + FORMULARIO ===== #}
+        <div class="col-12 col-lg-7">
+
+            {# Paso 1: Descargar plantilla #}
+            <div class="detalle-card mb-4">
+                <div class="detalle-card-header">
+                    <span class="paso-num">1</span>
+                    Descarga la plantilla oficial
+                </div>
+                <div class="detalle-card-body">
+                    <p style="font-size:0.875rem; color:var(--texto-secundario); margin-bottom:1rem;">
+                        La plantilla ya tiene el formato correcto con columnas, ejemplo y hoja de categorías válidas.
+                        No la modifiques — solo llena las filas.
+                    </p>
+                    <a href="{{ url_for('descargar_plantilla') }}"
+                       class="btn btn-agregar" style="display:inline-flex;">
+                        <i class="bi bi-file-earmark-excel me-2"></i>Descargar plantilla .xlsx
+                    </a>
+                </div>
+            </div>
+
+            {# Paso 2: Subir archivo #}
+            <div class="detalle-card">
+                <div class="detalle-card-header">
+                    <span class="paso-num">2</span>
+                    Sube el archivo completado
+                </div>
+                <div class="detalle-card-body">
+                    <form method="POST"
+                          action="{{ url_for('procesar_carga_masiva') }}"
+                          enctype="multipart/form-data"
+                          id="form-carga">
+
+                        {# Zona de drop #}
+                        <div class="zona-drop" id="zona-drop"
+                             onclick="document.getElementById('archivo-input').click()">
+                            <i class="bi bi-cloud-upload zona-drop-icono"></i>
+                            <p class="zona-drop-texto">
+                                Haz clic aquí o arrastra tu archivo Excel
+                            </p>
+                            <p class="zona-drop-sub" id="nombre-archivo">
+                                .xlsx — máximo 500 productos
+                            </p>
+                        </div>
+
+                        <input type="file" id="archivo-input" name="archivo"
+                               accept=".xlsx,.xls" style="display:none"
+                               onchange="mostrarNombreArchivo(this)">
+
+                        <div class="d-flex gap-3 mt-4 align-items-center">
+                            <button type="submit" class="btn btn-agregar btn-guardar"
+                                    id="btn-subir" disabled>
+                                <i class="bi bi-upload me-2"></i>Procesar archivo
+                            </button>
+                            <a href="{{ url_for('lista_productos') }}" class="btn-cancelar">
+                                Cancelar
+                            </a>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+
+        </div>
+
+        {# ===== COLUMNA DERECHA: REGLAS + RESULTADO ===== #}
+        <div class="col-12 col-lg-5">
+
+            {# Reglas rápidas #}
+            <div class="detalle-card mb-4">
+                <div class="detalle-card-header">
+                    <i class="bi bi-info-circle me-2"></i>Reglas del archivo
+                </div>
+                <div class="detalle-card-body">
+                    <ul class="reglas-lista">
+                        <li><i class="bi bi-check2 text-success"></i> Usa la hoja llamada <strong>Productos</strong></li>
+                        <li><i class="bi bi-check2 text-success"></i> Fila 1 = encabezados (no tocar)</li>
+                        <li><i class="bi bi-check2 text-success"></i> Nombre, Categoría, Precio y Cantidad son obligatorios</li>
+                        <li><i class="bi bi-check2 text-success"></i> Precio: número sin $ ni puntos (ej: <code>1850000</code>)</li>
+                        <li><i class="bi bi-check2 text-success"></i> Cantidad: número entero (ej: <code>12</code>)</li>
+                        <li><i class="bi bi-check2 text-success"></i> Filas vacías se ignoran automáticamente</li>
+                        <li><i class="bi bi-check2 text-success"></i> Filas con error se reportan pero no detienen la carga</li>
+                        <li><i class="bi bi-x text-danger"></i> Máximo 500 productos por archivo</li>
+                    </ul>
+                </div>
+            </div>
+
+            {# Resultado de la carga (solo si se procesó un archivo) #}
+            {% if resumen %}
+            <div class="detalle-card">
+                <div class="detalle-card-header">
+                    <i class="bi bi-clipboard-check me-2"></i>Resultado del proceso
+                </div>
+                <div class="detalle-card-body">
+
+                    {# Resumen numérico #}
+                    <div class="row g-2 mb-3">
+                        <div class="col-4">
+                            <div class="resumen-stat stat-verde">
+                                <span class="stat-num">{{ resumen.guardados | length }}</span>
+                                <span class="stat-label">Guardados</span>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="resumen-stat stat-rojo">
+                                <span class="stat-num">{{ resumen.errores | length }}</span>
+                                <span class="stat-label">Con error</span>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="resumen-stat stat-gris">
+                                <span class="stat-num">{{ resumen.omitidas }}</span>
+                                <span class="stat-label">Omitidas</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {# Lista de errores #}
+                    {% if resumen.errores %}
+                    <div class="errores-lista">
+                        <p style="font-size:0.78rem; font-weight:600; color:var(--color-critico); margin-bottom:0.5rem;">
+                            <i class="bi bi-exclamation-triangle me-1"></i>Filas con error:
+                        </p>
+                        {% for err in resumen.errores %}
+                        <div class="error-item">
+                            <span class="error-fila">Fila {{ err.fila }}</span>
+                            <span class="error-nombre">{{ err.nombre }}</span>
+                            <span class="error-msg">{{ err.error }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {# Nombres de productos guardados (primeros 10) #}
+                    {% if resumen.guardados %}
+                    <div class="mt-3">
+                        <p style="font-size:0.78rem; font-weight:600; color:var(--color-normal); margin-bottom:0.5rem;">
+                            <i class="bi bi-check-circle me-1"></i>Productos guardados:
+                        </p>
+                        {% for nombre in resumen.guardados[:10] %}
+                        <div style="font-size:0.8rem; color:var(--texto-secundario); padding:2px 0;">
+                            • {{ nombre }}
+                        </div>
+                        {% endfor %}
+                        {% if resumen.guardados | length > 10 %}
+                        <div style="font-size:0.78rem; color:var(--texto-muted); margin-top:4px;">
+                            ... y {{ resumen.guardados | length - 10 }} más.
+                        </div>
+                        {% endif %}
+                        <a href="{{ url_for('lista_productos') }}"
+                           class="btn btn-agregar mt-3" style="display:inline-flex; font-size:0.82rem;">
+                            <i class="bi bi-list-ul me-1"></i>Ver productos cargados
+                        </a>
+                    </div>
+                    {% endif %}
+
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts_extra %}
+<script>
+function mostrarNombreArchivo(input) {
+    const nombre  = input.files[0]?.name || '';
+    const zona    = document.getElementById('zona-drop');
+    const label   = document.getElementById('nombre-archivo');
+    const btnSubir = document.getElementById('btn-subir');
+
+    if (nombre) {
+        label.textContent  = nombre;
+        zona.classList.add('zona-drop-activa');
+        btnSubir.disabled  = false;
+    } else {
+        label.textContent  = '.xlsx — máximo 500 productos';
+        zona.classList.remove('zona-drop-activa');
+        btnSubir.disabled  = true;
+    }
+}
+
+// Drag & drop
+const zona = document.getElementById('zona-drop');
+
+zona.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    zona.classList.add('zona-drop-hover');
+});
+
+zona.addEventListener('dragleave', () => {
+    zona.classList.remove('zona-drop-hover');
+});
+
+zona.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zona.classList.remove('zona-drop-hover');
+    const input = document.getElementById('archivo-input');
+    // Transferimos el archivo al input para que el form lo envíe
+    const dt = new DataTransfer();
+    dt.items.add(e.dataTransfer.files[0]);
+    input.files = dt.files;
+    mostrarNombreArchivo(input);
+});
+
+// Deshabilitar botón al enviar para evitar doble clic
+document.getElementById('form-carga').addEventListener('submit', function () {
+    const btn = document.getElementById('btn-subir');
+    btn.disabled  = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+});
+</script>
+{% endblock %}

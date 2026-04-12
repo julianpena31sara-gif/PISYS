@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block titulo %}Usuarios{% endblock %}
+
+{% block contenido %}
+<div class="page-header">
+    <div class="container-fluid px-4">
+        <div class="row align-items-center">
+            <div class="col">
+                <h1 class="page-title">Gestión de Usuarios</h1>
+                <p class="page-subtitle">{{ usuarios | length }} usuario(s) registrados</p>
+            </div>
+            <div class="col-auto">
+                <a href="{{ url_for('nuevo_usuario') }}" class="btn btn-agregar">
+                    <i class="bi bi-person-plus me-1"></i>Nuevo usuario
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid px-4 mt-4 mb-5">
+    <div class="tabla-container">
+        <div class="tabla-header">
+            <span><i class="bi bi-people me-2"></i>Todos los usuarios</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table tabla-productos mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Nombre</th>
+                        <th>Email</th>
+                        <th class="text-center">Rol</th>
+                        <th class="text-center">Estado</th>
+                        <th>Registrado</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in usuarios %}
+                    <tr class="fila-producto">
+                        <td class="id-col text-muted">{{ "%03d"|format(u.id) }}</td>
+                        <td>
+                            <div class="producto-nombre">
+                                {{ u.nombre }}
+                                {% if u.id == current_user.id %}
+                                <span class="badge bg-primary ms-1" style="font-size:0.65rem;">Tú</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="mono-font" style="font-size:0.82rem;">{{ u.email }}</td>
+                        <td class="text-center">
+                            {% if u.rol == 'admin' %}
+                                <span class="badge" style="background:#1E3A5F;">Administrador</span>
+                            {% elif u.rol == 'operador' %}
+                                <span class="badge bg-success">Operador</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Auditor</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if u.activo %}
+                                <span class="badge bg-success">Activo</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-size:0.82rem; color:var(--texto-secundario);">
+                            {{ u.fecha_creacion.strftime('%d/%m/%Y') }}
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex gap-1 justify-content-center">
+                                <a href="{{ url_for('editar_usuario', id=u.id) }}"
+                                   class="btn-accion btn-editar" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                {% if u.id != current_user.id %}
+                                <form method="POST"
+                                      action="{{ url_for('eliminar_usuario', id=u.id) }}"
+                                      id="del-u-{{ u.id }}">
+                                    <button type="button" class="btn-accion btn-eliminar"
+                                            title="Eliminar"
+                                            onclick="confirmarEliminarUsuario({{ u.id }}, '{{ u.nombre }}')">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="tabla-footer">
+            <span>{{ usuarios | length }} usuario(s)</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+function confirmarEliminarUsuario(id, nombre) {
+    if (confirm('¿Eliminar al usuario "' + nombre + '"?\nEsta acción no se puede deshacer.')) {
+        document.getElementById('del-u-' + id).submit();
+    }
+}
+</script>
+{% endblock %}

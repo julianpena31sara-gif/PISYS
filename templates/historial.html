@@ -8,7 +8,15 @@
         <div class="row align-items-center">
             <div class="col">
                 <h1 class="page-title">Historial de Movimientos</h1>
-                <p class="page-subtitle">Registro de todos los cambios de stock</p>
+                <p class="page-subtitle">
+                    Registro de todos los cambios de stock
+                    {% if fecha_desde or fecha_hasta %}
+                    — <span style="color:var(--color-primario); font-weight:500;">
+                        {% if fecha_desde %}desde {{ fecha_desde }}{% endif %}
+                        {% if fecha_hasta %} hasta {{ fecha_hasta }}{% endif %}
+                    </span>
+                    {% endif %}
+                </p>
             </div>
         </div>
     </div>
@@ -16,34 +24,63 @@
 
 <div class="container-fluid px-4 mt-4 mb-5">
 
-    <!-- Filtros por tipo -->
-    <div class="d-flex gap-2 mb-4 flex-wrap">
-        <a href="{{ url_for('historial') }}"
-           class="btn-filtro-tipo {% if not tipo_filtro %}activo{% endif %}">
-            Todos
-        </a>
-        <a href="{{ url_for('historial', tipo='entrada') }}"
-           class="btn-filtro-tipo entrada {% if tipo_filtro == 'entrada' %}activo{% endif %}">
-            <i class="bi bi-arrow-down-circle me-1"></i>Entradas
-        </a>
-        <a href="{{ url_for('historial', tipo='salida') }}"
-           class="btn-filtro-tipo salida {% if tipo_filtro == 'salida' %}activo{% endif %}">
-            <i class="bi bi-arrow-up-circle me-1"></i>Salidas
-        </a>
-        <a href="{{ url_for('historial', tipo='ajuste') }}"
-           class="btn-filtro-tipo ajuste {% if tipo_filtro == 'ajuste' %}activo{% endif %}">
-            <i class="bi bi-sliders me-1"></i>Ajustes
-        </a>
-        <a href="{{ url_for('historial', tipo='creacion') }}"
-           class="btn-filtro-tipo creacion {% if tipo_filtro == 'creacion' %}activo{% endif %}">
-            <i class="bi bi-plus-circle me-1"></i>Creaciones
-        </a>
-    </div>
+    {# ===== FILTROS ===== #}
+    <form method="GET" action="{{ url_for('historial') }}" class="filtros-form mb-4">
+        <div class="row g-3 align-items-end">
 
+            {# Filtro tipo #}
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="form-label-custom">Tipo de movimiento</label>
+                <select name="tipo" class="form-select input-custom" onchange="this.form.submit()">
+                    <option value=""         {% if not tipo_filtro %}selected{% endif %}>Todos</option>
+                    <option value="entrada"  {% if tipo_filtro == 'entrada' %}selected{% endif %}>Entradas</option>
+                    <option value="salida"   {% if tipo_filtro == 'salida' %}selected{% endif %}>Salidas</option>
+                    <option value="ajuste"   {% if tipo_filtro == 'ajuste' %}selected{% endif %}>Ajustes</option>
+                    <option value="creacion" {% if tipo_filtro == 'creacion' %}selected{% endif %}>Creaciones</option>
+                </select>
+            </div>
+
+            {# Fecha desde #}
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="form-label-custom">Desde</label>
+                <input type="date" name="fecha_desde" class="form-control input-custom"
+                       value="{{ fecha_desde }}">
+            </div>
+
+            {# Fecha hasta #}
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="form-label-custom">Hasta</label>
+                <input type="date" name="fecha_hasta" class="form-control input-custom"
+                       value="{{ fecha_hasta }}">
+            </div>
+
+            {# Botones #}
+            <div class="col-12 col-sm-6 col-md-3">
+                <button type="submit" class="btn btn-buscar w-100">
+                    <i class="bi bi-search me-1"></i>Filtrar
+                </button>
+                {% if tipo_filtro or fecha_desde or fecha_hasta %}
+                <a href="{{ url_for('historial') }}" class="btn-limpiar-todo">
+                    <i class="bi bi-x-circle me-1"></i>Limpiar filtros
+                </a>
+                {% endif %}
+            </div>
+
+        </div>
+
+    </form>
+
+    {# ===== TABLA ===== #}
     {% if movimientos.items %}
     <div class="tabla-container">
         <div class="tabla-header">
-            <span><i class="bi bi-clock-history me-2"></i>{{ movimientos.total }} movimiento(s)</span>
+            <span>
+                <i class="bi bi-clock-history me-2"></i>
+                {{ movimientos.total }} movimiento(s)
+            </span>
+            <span style="font-size:0.8rem; color:var(--texto-secundario);">
+                Página {{ movimientos.page }} de {{ movimientos.pages }}
+            </span>
         </div>
 
         <div class="table-responsive">
@@ -62,12 +99,12 @@
                 <tbody>
                     {% for mov in movimientos.items %}
                     <tr class="fila-producto">
-                        <td class="mono-font" style="font-size:0.8rem; color: var(--texto-secundario);">
+                        <td class="mono-font" style="font-size:0.8rem; color:var(--texto-secundario); white-space:nowrap;">
                             {{ mov.fecha.strftime('%d/%m/%Y %H:%M') }}
                         </td>
                         <td>
                             <a href="{{ url_for('detalle_producto', id=mov.producto_id) }}"
-                               style="text-decoration:none; color: var(--color-primario); font-weight:500;">
+                               style="text-decoration:none; color:var(--color-primario); font-weight:500;">
                                 {{ mov.producto.nombre }}
                             </a>
                         </td>
@@ -89,7 +126,7 @@
                             </span>
                         </td>
                         <td class="text-center mono-font">{{ mov.cantidad_nueva }}</td>
-                        <td style="font-size:0.82rem; color: var(--texto-secundario);">
+                        <td style="font-size:0.82rem; color:var(--texto-secundario);">
                             {{ mov.nota or '—' }}
                         </td>
                     </tr>
@@ -103,13 +140,14 @@
         </div>
     </div>
 
-    <!-- Paginación -->
+    {# Paginación — pasa los filtros activos para mantenerlos al cambiar de página #}
     {% if movimientos.pages > 1 %}
     <nav class="mt-4">
         <ul class="pagination-custom">
             <li>
                 {% if movimientos.has_prev %}
-                <a href="{{ url_for('historial', pagina=movimientos.prev_num, tipo=tipo_filtro) }}"
+                <a href="{{ url_for('historial', pagina=movimientos.prev_num,
+                            tipo=tipo_filtro, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta) }}"
                    class="btn-pagina"><i class="bi bi-chevron-left"></i> Anterior</a>
                 {% else %}
                 <span class="btn-pagina disabled"><i class="bi bi-chevron-left"></i> Anterior</span>
@@ -118,7 +156,8 @@
             {% for num in movimientos.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
                 {% if num %}
                 <li>
-                    <a href="{{ url_for('historial', pagina=num, tipo=tipo_filtro) }}"
+                    <a href="{{ url_for('historial', pagina=num,
+                                tipo=tipo_filtro, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta) }}"
                        class="btn-pagina {% if num == movimientos.page %}btn-pagina-activa{% endif %}">
                         {{ num }}
                     </a>
@@ -129,7 +168,8 @@
             {% endfor %}
             <li>
                 {% if movimientos.has_next %}
-                <a href="{{ url_for('historial', pagina=movimientos.next_num, tipo=tipo_filtro) }}"
+                <a href="{{ url_for('historial', pagina=movimientos.next_num,
+                            tipo=tipo_filtro, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta) }}"
                    class="btn-pagina">Siguiente <i class="bi bi-chevron-right"></i></a>
                 {% else %}
                 <span class="btn-pagina disabled">Siguiente <i class="bi bi-chevron-right"></i></span>
@@ -142,8 +182,15 @@
     {% else %}
     <div class="estado-vacio">
         <i class="bi bi-clock-history fs-1 text-muted"></i>
-        <h4 class="mt-3">Sin movimientos registrados</h4>
+        <h4 class="mt-3">Sin movimientos para este filtro</h4>
+        {% if tipo_filtro or fecha_desde or fecha_hasta %}
+        <p class="text-muted">
+            Intenta ampliar el rango de fechas o
+            <a href="{{ url_for('historial') }}">ver todos los movimientos</a>.
+        </p>
+        {% else %}
         <p class="text-muted">Los cambios de stock aparecerán aquí automáticamente.</p>
+        {% endif %}
     </div>
     {% endif %}
 

@@ -52,6 +52,19 @@
                         <i class="bi bi-box-seam me-1"></i>Productos
                     </a>
                 </li>
+
+                {# Solo admin ve carga masiva y usuarios #}
+                {% if current_user.is_authenticated and current_user.tiene_rol('admin') %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'carga_masiva' %}active{% endif %}"
+                       href="{{ url_for('carga_masiva') }}">
+                        <i class="bi bi-file-earmark-arrow-up me-1"></i>Carga masiva
+                    </a>
+                </li>
+                {% endif %}
+
+                {# Admin y auditor ven dashboard y reportes #}
+                {% if current_user.is_authenticated and current_user.tiene_rol('admin', 'auditor') %}
                 <li class="nav-item">
                     <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
                        href="{{ url_for('dashboard') }}">
@@ -64,23 +77,56 @@
                         <i class="bi bi-file-earmark-pdf me-1"></i>Reportes
                     </a>
                 </li>
+                {% endif %}
+
                 <li class="nav-item">
                     <a class="nav-link {% if request.endpoint == 'historial' %}active{% endif %}"
                        href="{{ url_for('historial') }}">
                         <i class="bi bi-clock-history me-1"></i>Historial
                     </a>
                 </li>
+
+                {# Solo admin ve gestión de usuarios #}
+                {% if current_user.is_authenticated and current_user.tiene_rol('admin') %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'lista_usuarios' %}active{% endif %}"
+                       href="{{ url_for('lista_usuarios') }}">
+                        <i class="bi bi-people me-1"></i>Usuarios
+                    </a>
+                </li>
+                {% endif %}
+
                 <li class="nav-item ms-2">
                     <button class="btn-tema" id="btn-tema" title="Cambiar tema"
                             onclick="toggleTema()">
                         <i class="bi bi-moon-fill" id="icono-tema"></i>
                     </button>
                 </li>
+
+                {# Botón nuevo producto solo para admin #}
+                {% if current_user.is_authenticated and current_user.tiene_rol('admin') %}
                 <li class="nav-item ms-1">
                     <a class="btn btn-agregar" href="{{ url_for('nuevo_producto') }}">
                         <i class="bi bi-plus-lg me-1"></i>Nuevo Producto
                     </a>
                 </li>
+                {% endif %}
+
+                {# Info usuario + cerrar sesión #}
+                {% if current_user.is_authenticated %}
+                <li class="nav-item ms-2 d-flex align-items-center gap-2">
+                    <div class="usuario-pill">
+                        <span class="usuario-rol-badge rol-{{ current_user.rol }}">
+                            {{ current_user.rol }}
+                        </span>
+                        <span class="usuario-nombre">{{ current_user.nombre.split()[0] }}</span>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="btn-tema" title="Cerrar sesión">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+
             </ul>
         </div>
     </div>

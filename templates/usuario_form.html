@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }}{% endblock %}
+
+{% block contenido %}
+<div class="page-header">
+    <div class="container-fluid px-4">
+        <nav class="breadcrumb-custom mb-2">
+            <a href="{{ url_for('inicio') }}"><i class="bi bi-house-door me-1"></i>Inicio</a>
+            <span class="breadcrumb-sep">/</span>
+            <a href="{{ url_for('lista_usuarios') }}">Usuarios</a>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-actual">{{ titulo }}</span>
+        </nav>
+        <div class="row align-items-center">
+            <div class="col">
+                <h1 class="page-title">{{ titulo }}</h1>
+            </div>
+            <div class="col-auto">
+                <a href="{{ url_for('lista_usuarios') }}" class="btn-volver">
+                    <i class="bi bi-arrow-left me-1"></i>Volver
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid px-4 mt-4 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-7 col-lg-5">
+
+            {% if usuario and usuario.id is defined %}
+                {% set form_action = url_for('editar_usuario', id=usuario.id) %}
+            {% else %}
+                {% set form_action = url_for('nuevo_usuario') %}
+            {% endif %}
+
+            <form method="POST" action="{{ form_action }}">
+
+                <div class="form-seccion mb-4">
+                    <div class="form-seccion-header">
+                        <i class="bi bi-person me-2"></i>Datos del usuario
+                    </div>
+                    <div class="form-seccion-body">
+
+                        <div class="campo-grupo mb-3">
+                            <label class="campo-etiqueta">Nombre completo <span class="campo-requerido">*</span></label>
+                            <input type="text" name="nombre" class="form-control input-custom"
+                                   placeholder="Ej: Juan Pérez"
+                                   value="{{ usuario.nombre if usuario else '' }}" required>
+                        </div>
+
+                        <div class="campo-grupo mb-3">
+                            <label class="campo-etiqueta">Email <span class="campo-requerido">*</span></label>
+                            <input type="email" name="email" class="form-control input-custom"
+                                   placeholder="usuario@pisys.com"
+                                   value="{{ usuario.email if usuario else '' }}" required>
+                        </div>
+
+                        <div class="campo-grupo mb-3">
+                            <label class="campo-etiqueta">
+                                Contraseña
+                                {% if usuario and usuario.id is defined %}
+                                <span class="campo-opcional">(dejar vacío para no cambiar)</span>
+                                {% else %}
+                                <span class="campo-requerido">*</span>
+                                {% endif %}
+                            </label>
+                            <input type="password" name="password" class="form-control input-custom"
+                                   placeholder="Mínimo 6 caracteres"
+                                   {% if not (usuario and usuario.id is defined) %}required{% endif %}>
+                        </div>
+
+                        <div class="campo-grupo mb-3">
+                            <label class="campo-etiqueta">Rol <span class="campo-requerido">*</span></label>
+                            <select name="rol" class="form-select input-custom">
+                                <option value="admin"    {% if usuario and usuario.rol == 'admin' %}selected{% endif %}>
+                                    Administrador — acceso total
+                                </option>
+                                <option value="operador" {% if not usuario or usuario.rol == 'operador' %}selected{% endif %}>
+                                    Operador — entradas y salidas de stock
+                                </option>
+                                <option value="auditor"  {% if usuario and usuario.rol == 'auditor' %}selected{% endif %}>
+                                    Auditor — solo lectura y reportes
+                                </option>
+                            </select>
+                        </div>
+
+                        {% if usuario and usuario.id is defined %}
+                        <div class="campo-grupo">
+                            <label class="campo-etiqueta d-flex align-items-center gap-2">
+                                <input type="checkbox" name="activo"
+                                       {% if usuario.activo %}checked{% endif %}
+                                       style="width:16px; height:16px;">
+                                Usuario activo
+                            </label>
+                            <div class="campo-ayuda">Los usuarios inactivos no pueden iniciar sesión.</div>
+                        </div>
+                        {% endif %}
+
+                    </div>
+                </div>
+
+                <div class="d-flex gap-3 justify-content-end">
+                    <a href="{{ url_for('lista_usuarios') }}" class="btn-cancelar">Cancelar</a>
+                    <button type="submit" class="btn btn-agregar btn-guardar">
+                        <i class="bi bi-check-lg me-1"></i>
+                        {% if usuario and usuario.id is defined %}Guardar cambios{% else %}Crear usuario{% endif %}
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

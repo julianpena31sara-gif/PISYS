@@ -116,12 +116,12 @@
                 <div class="reporte-info">
                     <h6 class="reporte-titulo">Historial de movimientos</h6>
                     <p class="reporte-desc">
-                        Registro completo de entradas, salidas y ajustes de stock
-                        con resumen de balance neto.
+                        Registro de entradas, salidas y ajustes de stock
+                        con resumen de balance neto. Filtra por tipo y rango de fechas.
                     </p>
                 </div>
                 <form method="GET" action="{{ url_for('reporte_historial') }}"
-                      class="reporte-filtro">
+                      class="reporte-filtro" target="_blank">
                     <select name="tipo" class="form-select input-custom"
                             style="font-size:0.82rem; height:36px;">
                         <option value="">Todos los tipos</option>
@@ -130,6 +130,20 @@
                         <option value="ajuste">Solo ajustes</option>
                         <option value="creacion">Solo creaciones</option>
                     </select>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label-custom" style="font-size:0.7rem;">Desde</label>
+                            <input type="date" name="fecha_desde"
+                                   class="form-control input-custom"
+                                   style="font-size:0.78rem; height:34px;">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label-custom" style="font-size:0.7rem;">Hasta</label>
+                            <input type="date" name="fecha_hasta"
+                                   class="form-control input-custom"
+                                   style="font-size:0.78rem; height:34px;">
+                        </div>
+                    </div>
                     <button type="submit" class="btn-reporte btn-reporte-morado">
                         <i class="bi bi-file-pdf me-1"></i>Generar PDF
                     </button>

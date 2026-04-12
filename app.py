@@ -1,5 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, make_response, send_file
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -8,6 +11,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 import io
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'clave-super-secreta-cambiala-en-produccion'
@@ -15,6 +20,12 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventario.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+# Flask-Login: maneja sesiones de usuario automáticamente
+login_manager = LoginManager(app)
+login_manager.login_view        = 'login'           # ruta a la que redirige si no hay sesión
+login_manager.login_message     = 'Inicia sesión para continuar.'
+login_manager.login_message_category = 'warning'
 
 
 # ---------------------------------------------------------------------------
@@ -61,6 +72,66 @@ class Movimiento(db.Model):
     def __repr__(self):
         signo = '+' if self.cantidad_cambio >= 0 else ''
         return f'<Movimiento {self.producto_id} {signo}{self.cantidad_cambio}>'
+
+
+class Usuario(UserMixin, db.Model):
+    """
+    Modelo de usuario con roles RBAC.
+    Hereda de UserMixin para que Flask-Login funcione automáticamente
+    (provee is_authenticated, is_active, get_id(), etc.)
+    Roles válidos: 'admin' | 'operador' | 'auditor'
+    """
+    __tablename__ = 'usuario'
+
+    id             = db.Column(db.Integer, primary_key=True)
+    nombre         = db.Column(db.String(80), nullable=False)
+    email          = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash  = db.Column(db.String(256), nullable=False)
+    rol            = db.Column(db.String(20), nullable=False, default='operador')
+    activo         = db.Column(db.Boolean, default=True)
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def set_password(self, password):
+        """Hashea y guarda la contraseña. Nunca guardamos texto plano."""
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        """Verifica la contraseña contra el hash guardado."""
+        return check_password_hash(self.password_hash, password)
+
+    def tiene_rol(self, *roles):
+        """Devuelve True si el usuario tiene alguno de los roles indicados."""
+        return self.rol in roles
+
+    def __repr__(self):
+        return f'<Usuario {self.email} [{self.rol}]>'
+
+
+@login_manager.user_loader
+def cargar_usuario(user_id):
+    """Flask-Login llama esto en cada request para reconstruir current_user."""
+    return Usuario.query.get(int(user_id))
+
+
+# ---------------------------------------------------------------------------
+# DECORADORES DE ROLES
+# ---------------------------------------------------------------------------
+
+def requiere_rol(*roles):
+    """
+    Decorador que restringe una ruta a uno o más roles específicos.
+    Uso: @requiere_rol('admin') o @requiere_rol('admin', 'operador')
+    Siempre va DESPUÉS de @login_required.
+    """
+    def decorador(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if not current_user.tiene_rol(*roles):
+                flash('⛔ No tienes permisos para acceder a esa sección.', 'danger')
+                return redirect(url_for('inicio'))
+            return f(*args, **kwargs)
+        return wrapper
+    return decorador
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +219,7 @@ CATEGORIAS = ['Electrónica', 'Papelería', 'Mobiliario', 'Limpieza',
 # ---------------------------------------------------------------------------
 
 @app.route('/')
+@login_required
 def inicio():
     productos = Producto.query.all()
     return render_template('inicio.html',
@@ -163,6 +235,7 @@ def inicio():
 # ---------------------------------------------------------------------------
 
 @app.route('/productos')
+@login_required
 def lista_productos():
     buscar    = request.args.get('buscar', '').strip()
     categoria = request.args.get('categoria', '')
@@ -185,11 +258,14 @@ def lista_productos():
 
 
 @app.route('/productos/<int:id>')
+@login_required
 def detalle_producto(id):
     return render_template('detalle.html', producto=Producto.query.get_or_404(id))
 
 
 @app.route('/productos/nuevo', methods=['GET', 'POST'])
+@login_required
+@requiere_rol('admin')
 def nuevo_producto():
     if request.method == 'POST':
         nombre      = request.form.get('nombre', '').strip()
@@ -234,6 +310,8 @@ def nuevo_producto():
 
 
 @app.route('/productos/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+@requiere_rol('admin')
 def editar_producto(id):
     producto = Producto.query.get_or_404(id)
 
@@ -281,6 +359,8 @@ def editar_producto(id):
 
 
 @app.route('/productos/eliminar/<int:id>', methods=['POST'])
+@login_required
+@requiere_rol('admin')
 def eliminar_producto(id):
     producto = Producto.query.get_or_404(id)
     nombre   = producto.nombre
@@ -292,6 +372,8 @@ def eliminar_producto(id):
 
 
 @app.route('/productos/ajustar-stock/<int:id>', methods=['POST'])
+@login_required
+@requiere_rol('admin', 'operador')
 def ajustar_stock(id):
     producto = Producto.query.get_or_404(id)
 
@@ -329,18 +411,45 @@ def ajustar_stock(id):
 # ---------------------------------------------------------------------------
 
 @app.route('/historial')
+@login_required
+@requiere_rol('admin', 'auditor')
 def historial():
     pagina      = request.args.get('pagina', 1, type=int)
     tipo_filtro = request.args.get('tipo', '')
+    fecha_desde = request.args.get('fecha_desde', '')
+    fecha_hasta = request.args.get('fecha_hasta', '')
 
     consulta = Movimiento.query
+
     if tipo_filtro:
         consulta = consulta.filter(Movimiento.tipo == tipo_filtro)
+
+    # Convertir strings a datetime y aplicar filtros de fecha
+    dt_desde = dt_hasta = None
+    if fecha_desde:
+        try:
+            dt_desde = datetime.strptime(fecha_desde, '%Y-%m-%d')
+            consulta = consulta.filter(Movimiento.fecha >= dt_desde)
+        except ValueError:
+            flash('❌ Fecha "desde" inválida.', 'danger')
+
+    if fecha_hasta:
+        try:
+            # Incluir todo el día hasta (hasta las 23:59:59)
+            dt_hasta = datetime.strptime(fecha_hasta, '%Y-%m-%d').replace(
+                hour=23, minute=59, second=59)
+            consulta = consulta.filter(Movimiento.fecha <= dt_hasta)
+        except ValueError:
+            flash('❌ Fecha "hasta" inválida.', 'danger')
 
     movimientos = consulta.order_by(Movimiento.fecha.desc()) \
                           .paginate(page=pagina, per_page=20, error_out=False)
 
-    return render_template('historial.html', movimientos=movimientos, tipo_filtro=tipo_filtro)
+    return render_template('historial.html',
+                           movimientos=movimientos,
+                           tipo_filtro=tipo_filtro,
+                           fecha_desde=fecha_desde,
+                           fecha_hasta=fecha_hasta)
 
 
 # ---------------------------------------------------------------------------
@@ -348,6 +457,8 @@ def historial():
 # ---------------------------------------------------------------------------
 
 @app.route('/reportes')
+@login_required
+@requiere_rol('admin', 'auditor')
 def reportes():
     productos = Producto.query.all()
     categorias = [c[0] for c in db.session.query(Producto.categoria)
@@ -362,6 +473,8 @@ def reportes():
 
 
 @app.route('/reportes/inventario')
+@login_required
+@requiere_rol('admin', 'auditor')
 def reporte_inventario():
     """Semana 8 — PDF completo de inventario con colores por estado y resumen."""
     categoria_filtro = request.args.get('categoria', '')
@@ -437,6 +550,8 @@ def reporte_inventario():
 
 
 @app.route('/reportes/alertas')
+@login_required
+@requiere_rol('admin', 'auditor')
 def reporte_alertas():
     """Semana 8 — PDF de productos con stock crítico o bajo."""
     productos_alerta = Producto.query.filter(Producto.cantidad < 10) \
@@ -482,14 +597,46 @@ def reporte_alertas():
 
 
 @app.route('/reportes/historial')
+@login_required
+@requiere_rol('admin', 'auditor')
 def reporte_historial():
-    """Semana 9 — PDF del historial de movimientos con resumen por tipo."""
+    """PDF del historial de movimientos con filtros de tipo y fechas."""
     tipo_filtro = request.args.get('tipo', '')
+    fecha_desde = request.args.get('fecha_desde', '')
+    fecha_hasta = request.args.get('fecha_hasta', '')
 
     consulta = Movimiento.query
+
     if tipo_filtro:
         consulta = consulta.filter(Movimiento.tipo == tipo_filtro)
+
+    dt_desde = dt_hasta = None
+    if fecha_desde:
+        try:
+            dt_desde = datetime.strptime(fecha_desde, '%Y-%m-%d')
+            consulta = consulta.filter(Movimiento.fecha >= dt_desde)
+        except ValueError:
+            pass
+
+    if fecha_hasta:
+        try:
+            dt_hasta = datetime.strptime(fecha_hasta, '%Y-%m-%d').replace(
+                hour=23, minute=59, second=59)
+            consulta = consulta.filter(Movimiento.fecha <= dt_hasta)
+        except ValueError:
+            pass
+
     movimientos = consulta.order_by(Movimiento.fecha.desc()).all()
+
+    # Construir subtítulo descriptivo con los filtros activos
+    partes = []
+    if tipo_filtro:
+        partes.append(f'Tipo: {tipo_filtro.capitalize()}')
+    if fecha_desde:
+        partes.append(f'Desde: {dt_desde.strftime("%d/%m/%Y")}')
+    if fecha_hasta:
+        partes.append(f'Hasta: {dt_hasta.strftime("%d/%m/%Y")}')
+    subtitulo = ' · '.join(partes) if partes else 'Todos los movimientos'
 
     buffer  = io.BytesIO()
     doc     = SimpleDocTemplate(buffer, pagesize=letter,
@@ -498,11 +645,10 @@ def reporte_historial():
     estilos   = _estilos_pdf()
     elementos = []
 
-    subtitulo = f'Tipo: {tipo_filtro.capitalize()}' if tipo_filtro else 'Todos los movimientos'
     _encabezado_pdf(elementos, estilos, 'Historial de Movimientos', subtitulo)
 
     if not movimientos:
-        elementos.append(Paragraph('No hay movimientos registrados aún.', estilos['normal']))
+        elementos.append(Paragraph('No hay movimientos para el rango seleccionado.', estilos['normal']))
     else:
         filas = [['Fecha', 'Producto', 'Tipo', 'Antes', 'Cambio', 'Después', 'Nota']]
         for m in movimientos:
@@ -532,12 +678,11 @@ def reporte_historial():
         tabla.setStyle(estilo)
         elementos.append(tabla)
 
-        # Resumen de totales por tipo
         elementos.append(Spacer(1, 0.5*cm))
         elementos.append(Paragraph('Resumen', estilos['seccion']))
-        entradas  = sum(m.cantidad_cambio for m in movimientos if m.cantidad_cambio > 0)
-        salidas   = sum(abs(m.cantidad_cambio) for m in movimientos if m.cantidad_cambio < 0)
-        resumen   = Table(
+        entradas = sum(m.cantidad_cambio for m in movimientos if m.cantidad_cambio > 0)
+        salidas  = sum(abs(m.cantidad_cambio) for m in movimientos if m.cantidad_cambio < 0)
+        resumen  = Table(
             [['Total movimientos', 'Unidades ingresadas', 'Unidades salidas', 'Balance neto'],
              [str(len(movimientos)), f'+{entradas}', f'-{salidas}', f'{entradas - salidas:+}']],
             colWidths=[4.5*cm] * 4
@@ -565,6 +710,8 @@ def reporte_historial():
 # ---------------------------------------------------------------------------
 
 @app.route('/dashboard')
+@login_required
+@requiere_rol('admin', 'auditor')
 def dashboard():
     productos  = Producto.query.all()
     movimientos = Movimiento.query.order_by(Movimiento.fecha.desc()).all()
@@ -668,12 +815,414 @@ def dashboard():
 
 
 # ---------------------------------------------------------------------------
-# ARRANQUE
+# RUTAS — CARGA MASIVA DESDE EXCEL
+# ---------------------------------------------------------------------------
+
+@app.route('/carga-masiva')
+@login_required
+@requiere_rol('admin')
+def carga_masiva():
+    return render_template('carga_masiva.html')
+
+
+@app.route('/carga-masiva/plantilla')
+@login_required
+@requiere_rol('admin')
+def descargar_plantilla():
+    """Genera y devuelve un archivo Excel listo para llenar."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Productos'
+
+    # --- Estilos ---
+    color_header   = '1E3A5F'
+    color_ejemplo  = 'EFF6FF'
+    borde_delgado  = Border(
+        left   = Side(style='thin', color='CBD5E1'),
+        right  = Side(style='thin', color='CBD5E1'),
+        top    = Side(style='thin', color='CBD5E1'),
+        bottom = Side(style='thin', color='CBD5E1'),
+    )
+
+    estilo_header = {
+        'font':      Font(name='Calibri', bold=True, color='FFFFFF', size=11),
+        'fill':      PatternFill(fill_type='solid', fgColor=color_header),
+        'alignment': Alignment(horizontal='center', vertical='center', wrap_text=True),
+        'border':    borde_delgado,
+    }
+    estilo_ejemplo = {
+        'font':      Font(name='Calibri', color='374151', size=10),
+        'fill':      PatternFill(fill_type='solid', fgColor=color_ejemplo),
+        'alignment': Alignment(horizontal='left', vertical='center'),
+        'border':    borde_delgado,
+    }
+    estilo_data = {
+        'font':      Font(name='Calibri', size=10),
+        'alignment': Alignment(horizontal='left', vertical='center'),
+        'border':    borde_delgado,
+    }
+
+    # --- Encabezados ---
+    columnas = [
+        ('nombre',      'Nombre del producto *', 30),
+        ('descripcion', 'Descripción',           40),
+        ('categoria',   'Categoría *',           18),
+        ('precio',      'Precio *',              14),
+        ('cantidad',    'Cantidad en stock *',   20),
+    ]
+
+    for col_idx, (_, titulo, ancho) in enumerate(columnas, start=1):
+        celda = ws.cell(row=1, column=col_idx, value=titulo)
+        for attr, val in estilo_header.items():
+            setattr(celda, attr, val)
+        ws.column_dimensions[celda.column_letter].width = ancho
+
+    ws.row_dimensions[1].height = 30
+
+    # --- Fila de ejemplo ---
+    ejemplo = ['Laptop Dell Inspiron 15', 'Intel i5, 8GB RAM, 256GB SSD',
+               'Electrónica', 1850000, 12]
+    for col_idx, valor in enumerate(ejemplo, start=1):
+        celda = ws.cell(row=2, column=col_idx, value=valor)
+        for attr, val in estilo_ejemplo.items():
+            setattr(celda, attr, val)
+
+    # --- 50 filas vacías para que el usuario llene ---
+    for fila in range(3, 53):
+        for col_idx in range(1, 6):
+            celda = ws.cell(row=fila, column=col_idx, value='')
+            for attr, val in estilo_data.items():
+                setattr(celda, attr, val)
+        ws.row_dimensions[fila].height = 18
+
+    # --- Hoja de categorías válidas como referencia ---
+    ws_cat = wb.create_sheet('Categorías válidas')
+    ws_cat['A1'] = 'Categorías disponibles'
+    ws_cat['A1'].font = Font(bold=True, color='FFFFFF', size=11)
+    ws_cat['A1'].fill = PatternFill(fill_type='solid', fgColor=color_header)
+    ws_cat['A1'].alignment = Alignment(horizontal='center')
+    ws_cat.column_dimensions['A'].width = 25
+
+    for i, cat in enumerate(CATEGORIAS, start=2):
+        ws_cat.cell(row=i, column=1, value=cat)
+
+    # --- Hoja de instrucciones ---
+    ws_inst = wb.create_sheet('Instrucciones')
+    instrucciones = [
+        ('INSTRUCCIONES DE USO', True),
+        ('', False),
+        ('1. Llena la hoja "Productos" con tus productos.', False),
+        ('2. La fila 2 (azul claro) es un ejemplo — puedes borrarla o reemplazarla.', False),
+        ('3. Campos obligatorios: Nombre, Categoría, Precio y Cantidad.', False),
+        ('4. La Categoría debe coincidir exactamente con las de la hoja "Categorías válidas".', False),
+        ('5. El Precio debe ser un número (sin $, sin puntos de miles, sin comas).', False),
+        ('   Ejemplo correcto: 1850000   Ejemplo incorrecto: $1.850.000', False),
+        ('6. La Cantidad debe ser un número entero (sin decimales).', False),
+        ('7. Filas completamente vacías se ignorarán automáticamente.', False),
+        ('8. Si una fila tiene error, se reporta pero el resto sí se guarda.', False),
+        ('', False),
+        ('Máximo 500 productos por archivo.', True),
+    ]
+    ws_inst.column_dimensions['A'].width = 70
+    for i, (texto, negrita) in enumerate(instrucciones, start=1):
+        celda = ws_inst.cell(row=i, column=1, value=texto)
+        celda.font = Font(bold=negrita, size=11 if negrita else 10)
+        celda.alignment = Alignment(wrap_text=True)
+
+    # --- Enviar como descarga ---
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name='plantilla_pisys.xlsx'
+    )
+
+
+@app.route('/carga-masiva/procesar', methods=['POST'])
+@login_required
+@requiere_rol('admin')
+def procesar_carga_masiva():
+    """Lee el Excel subido, valida cada fila y guarda los productos válidos."""
+
+    archivo = request.files.get('archivo')
+
+    if not archivo or archivo.filename == '':
+        flash('❌ No seleccionaste ningún archivo.', 'danger')
+        return redirect(url_for('carga_masiva'))
+
+    if not archivo.filename.endswith(('.xlsx', '.xls')):
+        flash('❌ El archivo debe ser Excel (.xlsx o .xls).', 'danger')
+        return redirect(url_for('carga_masiva'))
+
+    try:
+        wb = openpyxl.load_workbook(archivo, data_only=True)
+    except Exception:
+        flash('❌ No se pudo leer el archivo. Asegúrate de que sea un Excel válido.', 'danger')
+        return redirect(url_for('carga_masiva'))
+
+    # Intentamos leer la hoja "Productos"; si no existe, tomamos la primera
+    ws = wb['Productos'] if 'Productos' in wb.sheetnames else wb.active
+
+    guardados  = []   # productos que se guardaron exitosamente
+    errores    = []   # filas con problemas
+    omitidas   = 0    # filas completamente vacías
+
+    LIMITE = 500
+
+    for num_fila, fila in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        # Ignorar filas completamente vacías
+        if all(v is None or str(v).strip() == '' for v in fila):
+            omitidas += 1
+            continue
+
+        if len(guardados) >= LIMITE:
+            errores.append({'fila': num_fila, 'error': f'Límite de {LIMITE} productos alcanzado.'})
+            continue
+
+        # Leer cada columna con valor por defecto seguro
+        nombre      = str(fila[0]).strip() if fila[0] is not None else ''
+        descripcion = str(fila[1]).strip() if len(fila) > 1 and fila[1] is not None else ''
+        categoria   = str(fila[2]).strip() if len(fila) > 2 and fila[2] is not None else 'General'
+        precio_raw  = fila[3] if len(fila) > 3 else None
+        cantidad_raw = fila[4] if len(fila) > 4 else None
+
+        # --- Validaciones ---
+        errores_fila = []
+
+        if not nombre:
+            errores_fila.append('Nombre vacío')
+
+        if len(nombre) > 100:
+            errores_fila.append('Nombre supera 100 caracteres')
+
+        # Validar precio
+        try:
+            precio = float(str(precio_raw).replace(',', '.').replace('$', '').strip())
+            if precio < 0:
+                errores_fila.append('Precio negativo')
+        except (ValueError, TypeError):
+            precio = None
+            errores_fila.append(f'Precio inválido: "{precio_raw}"')
+
+        # Validar cantidad
+        try:
+            cantidad = int(float(str(cantidad_raw).strip()))
+            if cantidad < 0:
+                errores_fila.append('Cantidad negativa')
+        except (ValueError, TypeError):
+            cantidad = None
+            errores_fila.append(f'Cantidad inválida: "{cantidad_raw}"')
+
+        if errores_fila:
+            errores.append({
+                'fila':    num_fila,
+                'nombre':  nombre or '(sin nombre)',
+                'error':   ' · '.join(errores_fila)
+            })
+            continue
+
+        # --- Guardar producto válido ---
+        nuevo = Producto(
+            nombre      = nombre,
+            descripcion = descripcion,
+            precio      = precio,
+            cantidad    = cantidad,
+            categoria   = categoria if categoria in CATEGORIAS else 'General',
+        )
+        db.session.add(nuevo)
+        db.session.flush()  # obtener ID para el movimiento
+
+        if nuevo.cantidad > 0:
+            registrar_movimiento(nuevo, 0, tipo='creacion',
+                                 nota='Carga masiva desde Excel')
+
+        guardados.append(nombre)
+
+    # Commit de todos los productos válidos de una sola vez
+    if guardados:
+        db.session.commit()
+
+    # Guardar resultados en sesión para mostrarlos en la página
+    resumen = {
+        'guardados': guardados,
+        'errores':   errores,
+        'omitidas':  omitidas,
+    }
+
+    return render_template('carga_masiva.html', resumen=resumen)
+
+
+# ---------------------------------------------------------------------------
+# RUTAS — AUTENTICACIÓN
+# ---------------------------------------------------------------------------
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('inicio'))
+
+    if request.method == 'POST':
+        email    = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+
+        usuario = Usuario.query.filter_by(email=email).first()
+
+        if not usuario or not usuario.check_password(password):
+            flash('❌ Email o contraseña incorrectos.', 'danger')
+            return render_template('login.html')
+
+        if not usuario.activo:
+            flash('❌ Tu cuenta está desactivada. Contacta al administrador.', 'danger')
+            return render_template('login.html')
+
+        login_user(usuario, remember=True)
+        # Redirigir a la página que intentaba visitar, o al inicio
+        siguiente = request.args.get('next') or url_for('inicio')
+        return redirect(siguiente)
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('✅ Sesión cerrada correctamente.', 'success')
+    return redirect(url_for('login'))
+
+
+# ---------------------------------------------------------------------------
+# RUTAS — GESTIÓN DE USUARIOS (solo admin)
+# ---------------------------------------------------------------------------
+
+@app.route('/usuarios')
+@login_required
+@requiere_rol('admin')
+def lista_usuarios():
+    usuarios = Usuario.query.order_by(Usuario.fecha_creacion.desc()).all()
+    return render_template('usuarios.html', usuarios=usuarios)
+
+
+@app.route('/usuarios/nuevo', methods=['GET', 'POST'])
+@login_required
+@requiere_rol('admin')
+def nuevo_usuario():
+    if request.method == 'POST':
+        nombre   = request.form.get('nombre', '').strip()
+        email    = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        rol      = request.form.get('rol', 'operador')
+
+        errores = []
+        if not nombre:   errores.append('El nombre es obligatorio.')
+        if not email:    errores.append('El email es obligatorio.')
+        if not password: errores.append('La contraseña es obligatoria.')
+        if len(password) < 6: errores.append('La contraseña debe tener al menos 6 caracteres.')
+        if rol not in ('admin', 'operador', 'auditor'):
+            errores.append('Rol inválido.')
+        if Usuario.query.filter_by(email=email).first():
+            errores.append(f'El email {email} ya está registrado.')
+
+        if errores:
+            for e in errores: flash(f'❌ {e}', 'danger')
+            return render_template('usuario_form.html', titulo='Nuevo usuario', usuario=None)
+
+        u = Usuario(nombre=nombre, email=email, rol=rol)
+        u.set_password(password)
+        db.session.add(u)
+        db.session.commit()
+        flash(f'✅ Usuario "{nombre}" creado con rol {rol}.', 'success')
+        return redirect(url_for('lista_usuarios'))
+
+    return render_template('usuario_form.html', titulo='Nuevo usuario', usuario=None)
+
+
+@app.route('/usuarios/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+@requiere_rol('admin')
+def editar_usuario(id):
+    usuario = Usuario.query.get_or_404(id)
+
+    if request.method == 'POST':
+        nombre   = request.form.get('nombre', '').strip()
+        email    = request.form.get('email', '').strip().lower()
+        rol      = request.form.get('rol', 'operador')
+        password = request.form.get('password', '').strip()
+        activo   = request.form.get('activo') == 'on'
+
+        errores = []
+        if not nombre: errores.append('El nombre es obligatorio.')
+        if not email:  errores.append('El email es obligatorio.')
+        if rol not in ('admin', 'operador', 'auditor'): errores.append('Rol inválido.')
+        if password and len(password) < 6:
+            errores.append('La contraseña debe tener al menos 6 caracteres.')
+
+        # Verificar email único (excluyendo el propio usuario)
+        existente = Usuario.query.filter_by(email=email).first()
+        if existente and existente.id != id:
+            errores.append(f'El email {email} ya está en uso.')
+
+        # Evitar que el admin se desactive a sí mismo
+        if usuario.id == current_user.id and not activo:
+            errores.append('No puedes desactivar tu propia cuenta.')
+
+        if errores:
+            for e in errores: flash(f'❌ {e}', 'danger')
+            return render_template('usuario_form.html',
+                                   titulo=f'Editar: {usuario.nombre}', usuario=usuario)
+
+        usuario.nombre = nombre
+        usuario.email  = email
+        usuario.rol    = rol
+        usuario.activo = activo
+        if password:
+            usuario.set_password(password)
+
+        db.session.commit()
+        flash(f'✅ Usuario "{nombre}" actualizado.', 'success')
+        return redirect(url_for('lista_usuarios'))
+
+    return render_template('usuario_form.html',
+                           titulo=f'Editar: {usuario.nombre}', usuario=usuario)
+
+
+@app.route('/usuarios/eliminar/<int:id>', methods=['POST'])
+@login_required
+@requiere_rol('admin')
+def eliminar_usuario(id):
+    usuario = Usuario.query.get_or_404(id)
+
+    if usuario.id == current_user.id:
+        flash('❌ No puedes eliminar tu propia cuenta.', 'danger')
+        return redirect(url_for('lista_usuarios'))
+
+    nombre = usuario.nombre
+    db.session.delete(usuario)
+    db.session.commit()
+    flash(f'🗑️ Usuario "{nombre}" eliminado.', 'warning')
+    return redirect(url_for('lista_usuarios'))
+
+
+# ---------------------------------------------------------------------------
+# ARRANQUE — crea usuario admin por defecto si no existe ninguno
 # ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+
+        # Crear administrador por defecto si no hay ningún usuario
+        if Usuario.query.count() == 0:
+            admin = Usuario(nombre='Administrador', email='admin@pisys.com', rol='admin')
+            admin.set_password('admin123')
+            db.session.add(admin)
+            db.session.commit()
+            print('👤 Usuario admin creado: admin@pisys.com / admin123')
+            print('   ⚠️  Cambia la contraseña después del primer login.')
+
         print('✅ Base de datos lista')
         print('🚀 http://localhost:5000')
     app.run(debug=True)
