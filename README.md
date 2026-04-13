@@ -1,7 +1,7 @@
-# 📦 InvenSys — Sistema de Gestión de Inventario
+# 📦 PISYS — Sistema de Gestión de Inventario
 
 > Proyecto académico desarrollado en Python + Flask + SQLite  
-> Plan de 11 semanas | Tecnología en Desarrollo de Software
+> Plan de 16 semanas | Tecnología en Desarrollo de Software
 
 ---
 
@@ -85,12 +85,11 @@ inventario/
 
 ## 🗓️ Plan de desarrollo — 11 semanas
 
-| Semanas | Fase | Contenido |
-|---------|------|-----------|
-| 1–3     | ✅ Bases | Entorno, BD, HTML base |
-| 4–6     | 🔄 CRUD | Crear, editar, eliminar productos + alertas |
-| 7–9     | ⏳ Reportes | PDF con ReportLab |
-| 10–11   | ⏳ Dashboard | Gráficos Plotly + alertas predictivas |
+
+| ✅ Bases | Entorno, BD, HTML base |
+| 🔄 CRUD | Crear, editar, eliminar productos + alertas |
+| ⏳ Reportes | PDF con ReportLab |
+| ⏳ Dashboard | Gráficos Plotly + alertas predictivas |
 
 ---
 
