@@ -264,8 +264,8 @@ def detalle_producto(id):
 
 
 @app.route('/productos/nuevo', methods=['GET', 'POST'])
+@requiere_rol('admin', 'operador')
 @login_required
-@requiere_rol('admin')
 def nuevo_producto():
     if request.method == 'POST':
         nombre      = request.form.get('nombre', '').strip()
@@ -310,8 +310,8 @@ def nuevo_producto():
 
 
 @app.route('/productos/editar/<int:id>', methods=['GET', 'POST'])
+@requiere_rol('admin', 'operador')
 @login_required
-@requiere_rol('admin')
 def editar_producto(id):
     producto = Producto.query.get_or_404(id)
 
@@ -359,8 +359,8 @@ def editar_producto(id):
 
 
 @app.route('/productos/eliminar/<int:id>', methods=['POST'])
-@login_required
 @requiere_rol('admin')
+@login_required
 def eliminar_producto(id):
     producto = Producto.query.get_or_404(id)
     nombre   = producto.nombre
@@ -372,8 +372,8 @@ def eliminar_producto(id):
 
 
 @app.route('/productos/ajustar-stock/<int:id>', methods=['POST'])
-@login_required
 @requiere_rol('admin', 'operador')
+@login_required
 def ajustar_stock(id):
     producto = Producto.query.get_or_404(id)
 
@@ -411,8 +411,8 @@ def ajustar_stock(id):
 # ---------------------------------------------------------------------------
 
 @app.route('/historial')
-@login_required
 @requiere_rol('admin', 'auditor')
+@login_required
 def historial():
     pagina      = request.args.get('pagina', 1, type=int)
     tipo_filtro = request.args.get('tipo', '')
@@ -457,8 +457,8 @@ def historial():
 # ---------------------------------------------------------------------------
 
 @app.route('/reportes')
-@login_required
 @requiere_rol('admin', 'auditor')
+@login_required
 def reportes():
     productos = Producto.query.all()
     categorias = [c[0] for c in db.session.query(Producto.categoria)
@@ -473,8 +473,8 @@ def reportes():
 
 
 @app.route('/reportes/inventario')
-@login_required
 @requiere_rol('admin', 'auditor')
+@login_required
 def reporte_inventario():
     """Semana 8 — PDF completo de inventario con colores por estado y resumen."""
     categoria_filtro = request.args.get('categoria', '')
@@ -550,8 +550,8 @@ def reporte_inventario():
 
 
 @app.route('/reportes/alertas')
-@login_required
 @requiere_rol('admin', 'auditor')
+@login_required
 def reporte_alertas():
     """Semana 8 — PDF de productos con stock crítico o bajo."""
     productos_alerta = Producto.query.filter(Producto.cantidad < 10) \
@@ -597,8 +597,8 @@ def reporte_alertas():
 
 
 @app.route('/reportes/historial')
-@login_required
 @requiere_rol('admin', 'auditor')
+@login_required
 def reporte_historial():
     """PDF del historial de movimientos con filtros de tipo y fechas."""
     tipo_filtro = request.args.get('tipo', '')
@@ -706,12 +706,95 @@ def reporte_historial():
 
 
 # ---------------------------------------------------------------------------
+# RUTAS — API BOT PREDICCIONES
+# ---------------------------------------------------------------------------
+
+@app.route('/api/predicciones')
+@login_required
+def api_predicciones():
+    """
+    Devuelve JSON con el análisis predictivo de todos los productos.
+    El bot flotante consume este endpoint para generar sus respuestas.
+    """
+    from datetime import timedelta
+    from collections import defaultdict
+    import json
+
+    hace_30 = datetime.utcnow() - timedelta(days=30)
+    productos = Producto.query.all()
+
+    resumen_inventario = {
+        'total_productos':  len(productos),
+        'valor_total':      round(sum(p.valor_total() for p in productos), 0),
+        'criticos':         [],
+        'bajos':            [],
+        'normales':         [],
+        'predicciones':     [],
+        'sin_movimiento':   [],
+    }
+
+    for p in productos:
+        info_base = {
+            'id':        p.id,
+            'nombre':    p.nombre,
+            'categoria': p.categoria or 'General',
+            'cantidad':  p.cantidad,
+            'precio':    p.precio,
+        }
+
+        # Calcular promedio de salidas últimos 30 días
+        salidas = [
+            abs(m.cantidad_cambio)
+            for m in p.movimientos
+            if m.cantidad_cambio < 0 and m.fecha >= hace_30
+        ]
+        total_salidas = sum(salidas)
+        promedio_diario = round(total_salidas / 30, 2)
+
+        if promedio_diario > 0:
+            dias_restantes = round(p.cantidad / promedio_diario, 1)
+            fecha_agotamiento = (
+                datetime.utcnow() + timedelta(days=dias_restantes)
+            ).strftime('%d/%m/%Y')
+
+            pred = {
+                **info_base,
+                'promedio_diario':    promedio_diario,
+                'dias_restantes':     dias_restantes,
+                'fecha_agotamiento':  fecha_agotamiento,
+                'urgencia': (
+                    'critica'      if dias_restantes <= 7  else
+                    'advertencia'  if dias_restantes <= 14 else
+                    'normal'
+                ),
+            }
+            resumen_inventario['predicciones'].append(pred)
+        else:
+            resumen_inventario['sin_movimiento'].append(info_base)
+
+        # Clasificar por estado actual
+        estado = p.estado_stock()
+        if estado == 'critico':
+            resumen_inventario['criticos'].append(info_base)
+        elif estado == 'bajo':
+            resumen_inventario['bajos'].append(info_base)
+        else:
+            resumen_inventario['normales'].append(info_base)
+
+    # Ordenar predicciones por urgencia
+    resumen_inventario['predicciones'].sort(key=lambda x: x['dias_restantes'])
+
+    from flask import jsonify
+    return jsonify(resumen_inventario)
+
+
+# ---------------------------------------------------------------------------
 # RUTAS — DASHBOARD Y ALERTAS PREDICTIVAS (Semanas 10 y 11)
 # ---------------------------------------------------------------------------
 
 @app.route('/dashboard')
+@requiere_rol('admin', 'auditor', 'operador')
 @login_required
-@requiere_rol('admin', 'auditor')
 def dashboard():
     productos  = Producto.query.all()
     movimientos = Movimiento.query.order_by(Movimiento.fecha.desc()).all()
@@ -819,15 +902,15 @@ def dashboard():
 # ---------------------------------------------------------------------------
 
 @app.route('/carga-masiva')
+@requiere_rol('admin', 'operador')
 @login_required
-@requiere_rol('admin')
 def carga_masiva():
     return render_template('carga_masiva.html')
 
 
 @app.route('/carga-masiva/plantilla')
+@requiere_rol('admin', 'operador')
 @login_required
-@requiere_rol('admin')
 def descargar_plantilla():
     """Genera y devuelve un archivo Excel listo para llenar."""
     wb = openpyxl.Workbook()
@@ -942,8 +1025,8 @@ def descargar_plantilla():
 
 
 @app.route('/carga-masiva/procesar', methods=['POST'])
+@requiere_rol('admin', 'operador')
 @login_required
-@requiere_rol('admin')
 def procesar_carga_masiva():
     """Lee el Excel subido, valida cada fila y guarda los productos válidos."""
 
@@ -1099,16 +1182,16 @@ def logout():
 # ---------------------------------------------------------------------------
 
 @app.route('/usuarios')
+@requiere_rol('admin', 'auditor')
 @login_required
-@requiere_rol('admin')
 def lista_usuarios():
     usuarios = Usuario.query.order_by(Usuario.fecha_creacion.desc()).all()
     return render_template('usuarios.html', usuarios=usuarios)
 
 
 @app.route('/usuarios/nuevo', methods=['GET', 'POST'])
-@login_required
 @requiere_rol('admin')
+@login_required
 def nuevo_usuario():
     if request.method == 'POST':
         nombre   = request.form.get('nombre', '').strip()
@@ -1141,8 +1224,8 @@ def nuevo_usuario():
 
 
 @app.route('/usuarios/editar/<int:id>', methods=['GET', 'POST'])
-@login_required
 @requiere_rol('admin')
+@login_required
 def editar_usuario(id):
     usuario = Usuario.query.get_or_404(id)
 
@@ -1190,8 +1273,8 @@ def editar_usuario(id):
 
 
 @app.route('/usuarios/eliminar/<int:id>', methods=['POST'])
-@login_required
 @requiere_rol('admin')
+@login_required
 def eliminar_usuario(id):
     usuario = Usuario.query.get_or_404(id)
 
