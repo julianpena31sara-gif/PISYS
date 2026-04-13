@@ -1300,16 +1300,12 @@ def eliminar_usuario(id):
 
 
     with app.app_context():
-        db.create_all()
+    db.create_all()
+    if Usuario.query.count() == 0:
+        admin = Usuario(nombre='Administrador', email='admin@pisys.com', rol='admin')
+        admin.set_password('admin123')
+        db.session.add(admin)
+        db.session.commit()
 
-        # Crear administrador por defecto si no hay ningún usuario
-        if Usuario.query.count() == 0:
-            admin = Usuario(nombre='Administrador', email='admin@pisys.com', rol='admin')
-            admin.set_password('admin123')
-            db.session.add(admin)
-            db.session.commit()
-            
 if __name__ == '__main__':
-        print('✅ Base de datos lista')
-        print('🚀 http://localhost:5000')
-    app.run(debug=True)
+    app.run(debug=False)
