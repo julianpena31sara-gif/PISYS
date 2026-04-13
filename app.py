@@ -16,7 +16,12 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'clave-super-secreta-cambiala-en-produccion'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventario.db'
+import os
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///inventario.db')
+# Railway usa postgres://, SQLAlchemy necesita postgresql://
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -1293,7 +1298,7 @@ def eliminar_usuario(id):
 # ARRANQUE — crea usuario admin por defecto si no existe ninguno
 # ---------------------------------------------------------------------------
 
-if __name__ == '__main__':
+
     with app.app_context():
         db.create_all()
 
@@ -1303,9 +1308,8 @@ if __name__ == '__main__':
             admin.set_password('admin123')
             db.session.add(admin)
             db.session.commit()
-            print('👤 Usuario admin creado: admin@pisys.com / admin123')
-            print('   ⚠️  Cambia la contraseña después del primer login.')
-
+            
+if __name__ == '__main__':
         print('✅ Base de datos lista')
         print('🚀 http://localhost:5000')
     app.run(debug=True)
